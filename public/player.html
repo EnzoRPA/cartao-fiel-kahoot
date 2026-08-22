@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kahoot IA - Jogador</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+</head>
+<body class="player-body">
+
+  <main class="player-card">
+
+    <!-- 1. TELA DE ENTRADA DO JOGADOR -->
+    <div id="player-login-screen" class="screen-view active">
+      <div class="glass-card" style="text-align: center;">
+        <div class="brand-logo" style="justify-content: center; font-size: 2.2rem; margin-bottom: 1rem;">
+          <span>⚡</span> KAHOOT <span style="color:#00e5ff">IA</span>
+        </div>
+
+        <div id="error-alert" style="display: none; background: rgba(226, 27, 60, 0.3); border: 1px solid var(--kahoot-red); padding: 0.8rem; border-radius: 10px; margin-bottom: 1rem; color: #ffb4c0; font-size: 0.95rem;">
+          PIN incorreto ou não encontrado.
+        </div>
+
+        <form id="player-join-form" onsubmit="handlePlayerJoin(event)">
+          <div class="form-group">
+            <label class="form-label" style="text-align: left;">PIN do Jogo:</label>
+            <input type="number" id="player-pin-input" class="form-input" style="font-size: 1.8rem; text-align: center; letter-spacing: 4px;" placeholder="000000" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" style="text-align: left;">Seu Apelido (Nickname):</label>
+            <input type="text" id="player-name-input" class="form-input" placeholder="Digite seu nome..." maxlength="15" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" style="text-align: left;">Escolha seu Avatar:</label>
+            <div class="avatar-picker">
+              <span class="avatar-option selected" onclick="selectAvatar('🚀')">🚀</span>
+              <span class="avatar-option" onclick="selectAvatar('🐯')">🐯</span>
+              <span class="avatar-option" onclick="selectAvatar('⚡')">⚡</span>
+              <span class="avatar-option" onclick="selectAvatar('🦊')">🦊</span>
+              <span class="avatar-option" onclick="selectAvatar('🐉')">🐉</span>
+              <span class="avatar-option" onclick="selectAvatar('👽')">👽</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 1rem;">
+            <span>🎮</span> Entrar no Jogo!
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. LOBBY DE ESPERA DO JOGADOR -->
+    <div id="player-lobby-screen" class="screen-view">
+      <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div id="player-avatar-display" style="font-size: 5rem; margin-bottom: 0.5rem; animation: bounce 1.2s infinite alternate;">
+          🚀
+        </div>
+        <h2 id="player-nickname-display" style="font-family: var(--font-heading); font-size: 2.2rem; margin-bottom: 0.5rem;">
+          Jogador
+        </h2>
+        <p style="font-size: 1.2rem; color: #00e5ff; font-weight: 700; margin-bottom: 1.5rem;">
+          Você está dentro!
+        </p>
+
+        <div style="background: rgba(0,0,0,0.3); padding: 1.2rem; border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
+          <p style="color: var(--text-muted);">Veja seu nome na tela principal do professor/host e aguarde o início do jogo!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. TELA DE RESPOSTA DO JOGADOR (4 BOTÕES ESTILO KAHOOT) -->
+    <div id="player-question-screen" class="screen-view">
+      <div style="text-align: center; margin-bottom: 0.5rem;">
+        <span id="player-q-progress" class="brand-badge" style="background: rgba(255,255,255,0.2);">
+          Pergunta 1
+        </span>
+      </div>
+
+      <div class="player-buttons-grid">
+        <button class="btn-kahoot-answer red" onclick="submitPlayerAnswer(0)">
+          <span>🔺</span>
+        </button>
+        <button class="btn-kahoot-answer blue" onclick="submitPlayerAnswer(1)">
+          <span>🔷</span>
+        </button>
+        <button class="btn-kahoot-answer yellow" onclick="submitPlayerAnswer(2)">
+          <span>🟡</span>
+        </button>
+        <button class="btn-kahoot-answer green" onclick="submitPlayerAnswer(3)">
+          <span>🟩</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. AGUARDANDO DEMAIS PARTICIPANTES -->
+    <div id="player-waiting-screen" class="screen-view">
+      <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem; animation: pulse 0.8s infinite alternate;">
+          ✨
+        </div>
+        <h2 style="font-family: var(--font-heading); font-size: 2rem; margin-bottom: 1rem;">
+          Resposta Registrada!
+        </h2>
+        <p style="color: var(--text-muted); font-size: 1.1rem;">
+          Aguarde o encerramento do tempo para ver o resultado...
+        </p>
+      </div>
+    </div>
+
+    <!-- 5. FEEDBACK DO RESULTADO DA PERGUNTA -->
+    <div id="player-result-screen" class="screen-view">
+      <div id="result-banner" class="feedback-banner correct">
+        <div id="result-icon" style="font-size: 4rem; margin-bottom: 0.5rem;">🎉</div>
+        <div id="result-title" class="feedback-title">CORRETO!</div>
+        <div id="result-points" class="feedback-points">+1000 pts</div>
+
+        <div style="margin-top: 1.5rem; background: rgba(0,0,0,0.25); padding: 1rem; border-radius: 12px;">
+          <div style="font-size: 1.1rem;">Pontuação Total: <strong id="result-total-score" style="color: white;">0</strong></div>
+          <div style="font-size: 1rem; color: var(--text-muted); margin-top: 4px;">Sua Posição: <strong id="result-rank" style="color: #ffea00;">#1</strong></div>
+        </div>
+
+        <div id="result-correct-answer-box" style="margin-top: 1rem; background: rgba(0,0,0,0.35); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);">
+          <span style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: #ffea00; font-weight: 800; display: block; margin-bottom: 4px;">✔ Resposta Correta:</span>
+          <strong id="result-correct-text" style="font-size: 1.25rem; color: white;">🟩 Opção Correta</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. FIM DE JOGO DO JOGADOR -->
+    <div id="player-gameover-screen" class="screen-view">
+      <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div id="player-final-medal" style="font-size: 5rem; margin-bottom: 1rem;">🏆</div>
+        <h2 style="font-family: var(--font-heading); font-size: 2.4rem; margin-bottom: 0.5rem; color: #ffea00;">
+          Jogo Concluído!
+        </h2>
+        <p style="color: var(--text-muted); font-size: 1.2rem; margin-bottom: 1.5rem;">
+          Sua Posição Final: <strong id="player-final-rank" style="color: white; font-size: 1.5rem;">#1</strong>
+        </p>
+
+        <div style="background: rgba(255,255,255,0.1); padding: 1.2rem; border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+          Pontuação Final: <br>
+          <strong id="player-final-score" style="font-size: 2.2rem; color: #00e5ff;">0 pts</strong>
+        </div>
+
+        <button class="btn btn-primary btn-lg" onclick="location.reload()" style="width: 100%;">
+          <span>🔄</span> Jogar Novamente
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="/js/audio.js"></script>
+  <script src="/js/player.js"></script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Créditos Bíblicos & Kahoot</title>
+  <link rel="stylesheet" href="/css/style-portal.css">
+  <!-- Biblioteca para leitura de QR Code via Webcam -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+
+  <!-- BARRA DE NAVEGAÇÃO -->
+  <nav class="navbar">
+    <a href="#" class="brand">
+      <div class="brand-logo">
+        <span>📖</span> CARTÃO <span style="color:#a78bfa">FIEL</span>
+      </div>
+      <span class="brand-badge">ADMIN</span>
+    </a>
+
+    <!-- ABAS DO PORTAL -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-participants')">
+        <span>👥</span> Participantes
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-scan')">
+        <span>📷</span> Escanear QR
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-kahoot')">
+        <span>⚡</span> Jogo de Quiz
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="container">
+
+    <!-- ABA 1: GERENCIAR PARTICIPANTES -->
+    <div id="tab-participants" class="tab-content active">
+      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: start;">
+        
+        <!-- Cadastro de Participantes -->
+        <div class="glass-card">
+          <h2 style="font-size: 1.4rem; margin-bottom: 1.5rem; color: #a78bfa; display: flex; align-items: center; gap: 0.5rem;">
+            <span>➕</span> Cadastrar Adolescente
+          </h2>
+          <form id="add-participant-form" onsubmit="handleAddParticipant(event)">
+            <div class="form-group">
+              <label class="form-label" for="participant-name">Nome do Participante:</label>
+              <input type="text" id="participant-name" class="form-input" placeholder="Ex: Guilherme Silva" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+              <span>💾</span> Adicionar e Salvar
+            </button>
+          </form>
+
+          <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border); text-align: center;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Gere os cartões físicos com QR Code para imprimir, recortar e plastificar.
+            </p>
+            <button class="btn btn-secondary" style="width: 100%;" onclick="printAllCards()">
+              <span>🖨️</span> Imprimir Todos os Cartões
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista e Saldos -->
+        <div class="glass-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1.4rem;">
+              👥 Lista de Participantes e Saldos
+            </h2>
+            <div id="participants-count" class="badge-credits" style="background: rgba(139, 92, 246, 0.1); color: #c084fc; border-color: rgba(139, 92, 246, 0.3);">
+              0 Cadastrados
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>ID do Cartão</th>
+                  <th>Saldo</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="participants-table-body">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ABA 2: ESCANEAR QR CODE -->
+    <div id="tab-scan" class="tab-content">
+      <div class="scanner-layout">
+        
+        <!-- Leitor de Câmera -->
+        <div class="glass-card">
+          <h2 style="font-size: 1.4rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: #a78bfa;">
+            <span>📷</span> Câmera / Leitor
+          </h2>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+            Aponte o QR Code do cartão impresso do adolescente para a câmera para creditar ou retirar pontos.
+          </p>
+          
+          <div class="camera-container">
+            <div id="reader"></div>
+            <div class="scanner-overlay">
+              <div class="scanner-laser"></div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: center;">
+            <button id="btn-start-camera" class="btn btn-success" onclick="startScanner()">
+              <span>🔌</span> Ligar Câmera
+            </button>
+            <button id="btn-stop-camera" class="btn btn-danger" onclick="stopScanner()" style="display: none;">
+              <span>❌</span> Desligar Câmera
+            </button>
+          </div>
+        </div>
+
+        <!-- Painel de Gerenciamento do Crédito -->
+        <div class="glass-card" id="scan-action-panel">
+          <div class="scan-result-card" style="text-align: center; padding: 2rem 0;" id="scan-placeholder">
+            <span style="font-size: 4rem; display: block; margin-bottom: 1rem; opacity: 0.5;">🎴</span>
+            <h3>Aguardando leitura de cartão...</h3>
+            <p style="color: var(--text-muted); max-width: 300px; margin: 0.5rem auto 0 auto; font-size: 0.9rem;">
+              Aproxime o cartão da câmera ativa para abrir o painel de créditos.
+            </p>
+          </div>
+
+          <div class="scan-result-card" id="scan-details" style="display: none;">
+            <div class="scan-result-header">
+              <div class="avatar-large" id="scan-avatar">👤</div>
+              <div style="text-align: left; flex: 1;">
+                <h3 id="scan-name" style="font-size: 1.3rem;">Nome do Adolescente</h3>
+                <span id="scan-id" style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted);">pXYZ123</span>
+              </div>
+              <div>
+                <span class="badge-credits" style="font-size: 1.1rem; padding: 0.5rem 1rem;">
+                  💰 <span id="scan-credits-balance">0</span> pts
+                </span>
+              </div>
+            </div>
+
+            <!-- Adicionar Pontos -->
+            <div>
+              <h4 style="margin-bottom: 0.75rem; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                Adicionar Créditos Rápidos
+              </h4>
+              <div class="quick-credits-grid">
+                <button class="btn btn-secondary" onclick="addCreditsDirectly(5, 'Presença no estudo')">+5</button>
+                <button class="btn btn-secondary" onclick="addCreditsDirectly(10, 'Participação na aula')">+10</button>
+                <button class="btn btn-secondary" onclick="addCreditsDirectly(20, 'Acertou dinâmica bíblica')">+20</button>
+                <button class="btn btn-secondary" onclick="addCreditsDirectly(50, 'Decorou verso bíblico')">+50</button>
+              </div>
+            </div>
+
+            <!-- Transação Manual -->
+            <form id="manual-transaction-form" onsubmit="handleManualTransaction(event)">
+              <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label">Quantidade:</label>
+                  <input type="number" id="tx-amount" class="form-input" placeholder="Ex: 15 ou -10" required>
+                  <small style="color: var(--text-muted); font-size: 0.75rem;">Negativo retira</small>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label">Motivo / Descrição:</label>
+                  <input type="text" id="tx-desc" class="form-input" placeholder="Ex: Comportamento, Resgate" required>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <span>💸</span> Lançar Transação
+              </button>
+            </form>
+
+            <!-- Histórico Recente do Adolescente -->
+            <div style="border-top: 1px solid var(--glass-border); padding-top: 1rem;">
+              <h4 style="margin-bottom: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
+                Histórico Recente
+              </h4>
+              <div class="transaction-list" id="scan-history" style="max-height: 150px; overflow-y: auto; padding-right: 5px;">
+                <!-- Lista preenchida via JS -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ABA 3: JOGO DE QUIZ (KAHOOT) -->
+    <div id="tab-kahoot" class="tab-content">
+      <div class="iframe-wrapper">
+        <iframe src="/kahoot.html" class="kahoot-iframe" id="kahoot-frame"></iframe>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- CONTÊNER DE IMPRESSÃO (Oculto em visualização normal, exibido em 'print') -->
+  <div id="print-area" class="print-cards-grid" style="display: none;">
+    <!-- Renderizado dinamicamente pelo JS -->
+  </div>
+
+  <!-- MODAL DE DETALHES E HISTÓRICO DE UM PARTICIPANTE -->
+  <div id="history-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="glass-card" style="max-width: 500px; width: 90%; position: relative;">
+      <button onclick="closeHistoryModal()" style="position: absolute; right: 1.5rem; top: 1.5rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">✕</button>
+      <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;" id="modal-name">Nome do Adolescente</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">Extrato completo de transações e saldo</p>
+      
+      <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px;">
+        <span style="font-weight: 600;">Saldo Atual:</span>
+        <span class="badge-credits" style="font-size: 1.2rem;" id="modal-balance">0 pts</span>
+      </div>
+
+      <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;" class="transaction-list" id="modal-history-list">
+        <!-- Preenchido via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="/js/portal.js"></script>
+</body>
+</html>

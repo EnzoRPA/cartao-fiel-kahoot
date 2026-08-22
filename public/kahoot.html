@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kahoot IA & QR Code - Painel do Host</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <!-- Socket.io e Confetti -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+
+  <!-- BARRA DE NAVEGAÇÃO -->
+  <nav class="navbar">
+    <a href="#" class="brand" onclick="showScreen('dashboard-screen')">
+      <div class="brand-logo">
+        <span>⚡</span> KAHOOT <span style="color:#00e5ff">IA</span>
+      </div>
+      <span class="brand-badge">HOST</span>
+    </a>
+
+    <div class="nav-links">
+      <button class="btn btn-ai" onclick="openAiModal()">
+        <span>🤖</span> Gerar com IA
+      </button>
+      <button class="btn btn-secondary" onclick="openCreateModal()">
+        <span>➕</span> Criar Quiz
+      </button>
+      <button class="btn btn-secondary" onclick="openSettingsModal()" title="Configurar Chave API Gemini">
+        <span>⚙️</span> API Key
+      </button>
+      <a href="/player.html" target="_blank" class="btn btn-primary">
+        <span>📱</span> Entrar como Jogador
+      </a>
+    </div>
+  </nav>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="container">
+
+    <!-- 1. DASHBOARD DE QUIZZES -->
+    <div id="dashboard-screen" class="screen-view active">
+      <div class="dashboard-header">
+        <div>
+          <h1 class="section-title">Seus Quizzes</h1>
+          <p style="color: var(--text-muted); margin-top: 4px;">Escolha um quiz existente ou gere um novo com IA para iniciar a partida.</p>
+        </div>
+        <button class="btn btn-ai btn-lg" onclick="openAiModal()">
+          <span>🤖</span> Gerar Quiz por IA
+        </button>
+      </div>
+
+      <div id="quiz-grid-container" class="quiz-grid">
+        <!-- Preenchido via JavaScript -->
+      </div>
+    </div>
+
+    <!-- 2. LOBBY DO JOGO (PIN & QR CODE) -->
+    <div id="lobby-screen" class="screen-view">
+      <div class="glass-card">
+        <div class="lobby-layout">
+
+          <!-- Coluna 1: PIN e QR Code -->
+          <div class="pin-display-box">
+            <div class="pin-label">Acesse e escaneie para jogar</div>
+            <div id="lobby-pin-code" class="pin-code">000 000</div>
+            
+            <div class="qr-code-wrapper">
+              <img id="lobby-qr-code" src="" alt="QR Code de Conexão" class="qr-code-img">
+            </div>
+
+            <div style="margin-top: 1rem; color: var(--text-muted); font-size: 0.95rem;">
+              URL de entrada: <br>
+              <strong id="lobby-join-url" style="color: #00e5ff;">http://...</strong>
+            </div>
+          </div>
+
+          <!-- Coluna 2: Jogadores Conectados -->
+          <div style="display: flex; flex-direction: column; height: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div class="player-count-badge">
+                <span>👥</span> <span id="lobby-player-count">0</span> Participantes
+              </div>
+
+              <button id="btn-start-game" class="btn btn-success btn-lg" onclick="hostStartGame()">
+                <span>🚀</span> Iniciar Jogo!
+              </button>
+            </div>
+
+            <div class="glass-card" style="flex: 1; min-height: 250px; background: rgba(0,0,0,0.2);">
+              <h3 style="font-family: var(--font-heading); margin-bottom: 1rem; color: var(--text-muted);">
+                Jogadores no lobby:
+              </h3>
+              <div id="lobby-players-list" class="players-grid">
+                <!-- Tags dos participantes inseridos dinamicamente -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. PERGUNTA EM ANDAMENTO (HOST VIEW) -->
+    <div id="host-question-screen" class="screen-view">
+      <div class="glass-card">
+        <div class="host-question-header">
+          <div>
+            <span id="question-progress-tag" class="brand-badge" style="background: #00e5ff; color: #000; font-size: 0.9rem;">
+              Pergunta 1 de 5
+            </span>
+          </div>
+
+          <div id="host-timer-display" class="timer-circle">20</div>
+
+          <div>
+            <span class="player-count-badge" style="font-size: 1rem; padding: 0.4rem 1rem;">
+              📥 <span id="answers-counter">0 / 0</span> Respostas
+            </span>
+          </div>
+        </div>
+
+        <div id="host-question-text" class="question-title-box">
+          Carregando pergunta...
+        </div>
+
+        <div class="kahoot-grid">
+          <div class="kahoot-option-card red">
+            <span class="kahoot-shape">🔺</span>
+            <span id="opt-text-0">Opção 1</span>
+          </div>
+          <div class="kahoot-option-card blue">
+            <span class="kahoot-shape">🔷</span>
+            <span id="opt-text-1">Opção 2</span>
+          </div>
+          <div class="kahoot-option-card yellow">
+            <span class="kahoot-shape">🟡</span>
+            <span id="opt-text-2">Opção 3</span>
+          </div>
+          <div class="kahoot-option-card green">
+            <span class="kahoot-shape">🟩</span>
+            <span id="opt-text-3">Opção 4</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+          <button class="btn btn-primary" onclick="hostShowReveal()">
+            <span>⏩</span> Encerrar Tempo & Revelar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. REVELAÇÃO E ESTATÍSTICAS DA PERGUNTA -->
+    <div id="host-reveal-screen" class="screen-view">
+      <div class="glass-card">
+        <h3 id="host-reveal-question-title" style="font-family: var(--font-heading); font-size: 1.4rem; text-align: center; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Pergunta...
+        </h3>
+
+        <div id="host-correct-answer-banner" class="correct-answer-banner">
+          <span class="correct-badge">✔ RESPOSTA CORRETA</span>
+          <div id="host-correct-answer-text" class="correct-answer-text">🟩 Opção Correta</div>
+        </div>
+
+        <h4 style="font-family: var(--font-heading); font-size: 1.2rem; text-align: center; margin-top: 1.5rem; color: var(--text-muted);">
+          Distribuição de Respostas dos Participantes:
+        </h4>
+
+        <div class="reveal-stats-grid">
+          <div class="stat-bar-col">
+            <div id="bar-fill-0" class="stat-bar-fill red" style="height: 10%;">0</div>
+            <div id="reveal-opt-card-0" class="kahoot-option-card red" style="width: 100%; margin-top: 10px; padding: 0.8rem; font-size: 1rem;">
+              <span class="kahoot-shape">🔺</span>
+              <span id="reveal-opt-text-0">Opção 1</span>
+            </div>
+          </div>
+
+          <div class="stat-bar-col">
+            <div id="bar-fill-1" class="stat-bar-fill blue" style="height: 10%;">0</div>
+            <div id="reveal-opt-card-1" class="kahoot-option-card blue" style="width: 100%; margin-top: 10px; padding: 0.8rem; font-size: 1rem;">
+              <span class="kahoot-shape">🔷</span>
+              <span id="reveal-opt-text-1">Opção 2</span>
+            </div>
+          </div>
+
+          <div class="stat-bar-col">
+            <div id="bar-fill-2" class="stat-bar-fill yellow" style="height: 10%;">0</div>
+            <div id="reveal-opt-card-2" class="kahoot-option-card yellow" style="width: 100%; margin-top: 10px; padding: 0.8rem; font-size: 1rem;">
+              <span class="kahoot-shape">🟡</span>
+              <span id="reveal-opt-text-2">Opção 3</span>
+            </div>
+          </div>
+
+          <div class="stat-bar-col">
+            <div id="bar-fill-3" class="stat-bar-fill green" style="height: 10%;">0</div>
+            <div id="reveal-opt-card-3" class="kahoot-option-card green" style="width: 100%; margin-top: 10px; padding: 0.8rem; font-size: 1rem;">
+              <span class="kahoot-shape">🟩</span>
+              <span id="reveal-opt-text-3">Opção 4</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; margin-top: 2rem;">
+          <button class="btn btn-primary btn-lg" onclick="hostShowLeaderboard()">
+            <span>🏆</span> Ver Placar de Líderes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. PLACAR DE LÍDERES (LEADERBOARD) -->
+    <div id="host-leaderboard-screen" class="screen-view">
+      <div class="glass-card" style="max-width: 750px; margin: 0 auto;">
+        <h2 style="font-family: var(--font-heading); font-size: 2.2rem; text-align: center; color: #ffea00;">
+          🏆 Placar Parcial
+        </h2>
+
+        <div id="leaderboard-items-container" class="leaderboard-list">
+          <!-- Itens do placar inseridos dinamicamente -->
+        </div>
+
+        <div style="display: flex; justify-content: center; margin-top: 2rem;">
+          <button id="btn-next-step" class="btn btn-success btn-lg" onclick="hostNextQuestion()">
+            <span>▶️</span> Próxima Pergunta
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. PÓDIO FINAL DE ENCERRAMENTO -->
+    <div id="host-podium-screen" class="screen-view">
+      <div class="glass-card">
+        <h1 style="font-family: var(--font-heading); font-size: 2.8rem; text-align: center; color: #ffea00;">
+          🎉 Vencedores do Quiz! 🎉
+        </h1>
+
+        <div class="podium-container">
+          <!-- 2º LUGAR -->
+          <div class="podium-place podium-second">
+            <div id="podium-avatar-2" class="podium-avatar">🥈</div>
+            <div id="podium-name-2" class="podium-name">Jogador 2</div>
+            <div id="podium-score-2" style="font-size: 0.9rem; color: var(--text-muted);">0 pts</div>
+            <div class="podium-block">2</div>
+          </div>
+
+          <!-- 1º LUGAR -->
+          <div class="podium-place podium-first">
+            <div id="podium-avatar-1" class="podium-avatar">👑</div>
+            <div id="podium-name-1" class="podium-name">Vencedor</div>
+            <div id="podium-score-1" style="font-size: 1rem; color: #ffea00; font-weight: bold;">0 pts</div>
+            <div class="podium-block">1</div>
+          </div>
+
+          <!-- 3º LUGAR -->
+          <div class="podium-place podium-third">
+            <div id="podium-avatar-3" class="podium-avatar">🥉</div>
+            <div id="podium-name-3" class="podium-name">Jogador 3</div>
+            <div id="podium-score-3" style="font-size: 0.9rem; color: var(--text-muted);">0 pts</div>
+            <div class="podium-block">3</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; margin-top: 2.5rem;">
+          <button class="btn btn-primary btn-lg" onclick="showScreen('dashboard-screen')">
+            <span>🏠</span> Voltar ao Painel Inicial
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: GERADOR DE QUIZ COM IA -->
+  <div id="ai-modal" class="modal-backdrop">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeAiModal()">✕</button>
+      <h2 style="font-family: var(--font-heading); font-size: 1.8rem; margin-bottom: 0.5rem; color: #ec4899;">
+        🤖 Gerar Quiz com Inteligência Artificial
+      </h2>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
+        Digite o assunto ou tema da aula e a IA irá criar as perguntas e alternativas automaticamente!
+      </p>
+
+      <form id="ai-generator-form" onsubmit="handleAiGenerate(event)">
+        <div class="form-group">
+          <label class="form-label">Tema ou Assunto do Quiz:</label>
+          <input type="text" id="ai-topic-input" class="form-input" placeholder="Ex: História do Brasil, Geometria Básica, Vingadores..." required>
+        </div>
+
+        <div class="form-group" style="display: flex; gap: 1rem;">
+          <div style="flex: 1;">
+            <label class="form-label">Qtd. de Perguntas:</label>
+            <select id="ai-num-select" class="form-select">
+              <option value="3">3 Perguntas</option>
+              <option value="5" selected>5 Perguntas</option>
+              <option value="8">8 Perguntas</option>
+              <option value="10">10 Perguntas</option>
+            </select>
+          </div>
+
+          <div style="flex: 1;">
+            <label class="form-label">Dificuldade:</label>
+            <select id="ai-diff-select" class="form-select">
+              <option value="facil">Fácil</option>
+              <option value="medio" selected>Médio</option>
+              <option value="dificil">Desafiador</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="ai-loading-indicator" style="display: none; text-align: center; margin: 1.2rem 0; color: #00e5ff; font-weight: bold;">
+          <span style="font-size: 1.5rem; display: inline-block; animation: pulse 0.8s infinite;">✨</span>
+          Gerando perguntas com IA... Aguarde alguns instantes.
+        </div>
+
+        <button type="submit" id="btn-submit-ai" class="btn btn-ai btn-lg" style="width: 100%; margin-top: 1rem;">
+          <span>✨</span> Criar Quiz Agora
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURAÇÕES / CHAVE API GEMINI -->
+  <div id="settings-modal" class="modal-backdrop">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+      <h2 style="font-family: var(--font-heading); font-size: 1.6rem; margin-bottom: 0.5rem;">
+        ⚙️ Configurar Chave API Gemini
+      </h2>
+      <p style="color: var(--text-muted); margin-bottom: 1.2rem; font-size: 0.95rem;">
+        Insira sua chave de API do Google Gemini se quiser utilizar seu próprio limite de cota oficial. Se deixar em branco, o sistema utilizará o modo assistente inteligente integrado.
+      </p>
+
+      <div class="form-group">
+        <label class="form-label">Chave API do Gemini (opcional):</label>
+        <input type="password" id="gemini-api-key-input" class="form-input" placeholder="AIzaSy...">
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveGeminiApiKey()">
+        💾 Salvar Configurações
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: CRIAR QUIZ MANUALMENTE -->
+  <div id="create-modal" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 650px;">
+      <button class="modal-close" onclick="closeCreateModal()">✕</button>
+      <h2 style="font-family: var(--font-heading); font-size: 1.6rem; margin-bottom: 1rem;">
+        📝 Criar Quiz Personalizado
+      </h2>
+
+      <form id="custom-quiz-form" onsubmit="handleSaveCustomQuiz(event)">
+        <div class="form-group">
+          <label class="form-label">Título do Quiz:</label>
+          <input type="text" id="custom-title-input" class="form-input" placeholder="Ex: Quiz de Biologia Celular" required>
+        </div>
+
+        <div style="max-height: 320px; overflow-y: auto; padding-right: 8px;" id="custom-questions-wrapper">
+          <!-- Perguntas adicionadas via JS -->
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 1rem;">
+          <button type="button" class="btn btn-secondary" onclick="addQuestionFieldToForm()">
+            <span>➕</span> Add Pergunta
+          </button>
+          <button type="submit" class="btn btn-success" style="flex: 1;">
+            <span>💾</span> Salvar Quiz
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="/js/audio.js"></script>
+  <script src="/js/host.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "name": "kahoot-ai-qrcode",
+  "version": "1.0.0",
+  "description": "Plataforma interativa de Quiz estilo Kahoot com suporte a QR Code e Gerador por IA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "kahoot",
+    "quiz",
+    "socket.io",
+    "gemini",
+    "ai",
+    "qrcode",
+    "realtime"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "latest",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  }
+}
