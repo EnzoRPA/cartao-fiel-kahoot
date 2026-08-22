@@ -346,7 +346,7 @@ function hostLaunchQuiz(quizIndex) {
   currentQuiz = quizzes[quizIndex];
   if (!currentQuiz) return;
 
-  socket.emit('create-room', { quiz: currentQuiz });
+  socket.emit('create-room', { quiz: currentQuiz, baseUrl: window.location.origin });
 }
 
 socket.on('room-created', ({ pin, joinUrl, qrCodeDataUrl }) => {

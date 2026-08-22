@@ -181,7 +181,8 @@ function renderPrintArea(participants) {
   
   participants.forEach(p => {
     // URL que o QR code vai ler
-    const cardUrl = `http://${serverIp}:${serverPort}/card.html?id=${p.id}`;
+    const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : `http://${serverIp}:${serverPort}`;
+    const cardUrl = `${origin}/card.html?id=${p.id}`;
     // URL da nossa API interna de QR Code
     const qrImageSrc = `/api/qr?text=${encodeURIComponent(cardUrl)}`;
     

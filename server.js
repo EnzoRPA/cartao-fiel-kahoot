@@ -341,9 +341,10 @@ app.get('/api/qr', async (req, res) => {
 io.on('connection', (socket) => {
 
   // --- EVENTOS DO HOST ---
-  socket.on('create-room', async ({ quiz }) => {
+  socket.on('create-room', async ({ quiz, baseUrl }) => {
     const pin = generateRoomPIN();
-    const joinUrl = `http://${LOCAL_IP}:${PORT}/player.html?pin=${pin}`;
+    const hostBase = (baseUrl && baseUrl !== 'null') ? baseUrl : `http://${LOCAL_IP}:${PORT}`;
+    const joinUrl = `${hostBase}/player.html?pin=${pin}`;
 
     let qrCodeDataUrl = '';
     try {
