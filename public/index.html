@@ -218,12 +218,22 @@
       <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;" id="modal-name">Nome do Adolescente</h2>
       <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">Extrato completo de transações e saldo</p>
       
-      <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px;">
-        <span style="font-weight: 600;">Saldo Atual:</span>
-        <span class="badge-credits" style="font-size: 1.2rem;" id="modal-balance">0 pts</span>
+      <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <span style="font-weight: 600;">Saldo Atual:</span>
+          <span class="badge-credits" style="font-size: 1.2rem; margin-left: 0.5rem;" id="modal-balance">0 pts</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-icon" onclick="promptSetBalance()" title="Definir Saldo Exato" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+            ✏️ Ajustar
+          </button>
+          <button class="btn btn-danger btn-icon" onclick="resetParticipantBalance()" title="Zerar Pontos" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+            🔄 Zerar
+          </button>
+        </div>
       </div>
 
-      <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;" class="transaction-list" id="modal-history-list">
+      <div style="max-height: 280px; overflow-y: auto; padding-right: 5px;" class="transaction-list" id="modal-history-list">
         <!-- Preenchido via JS -->
       </div>
     </div>

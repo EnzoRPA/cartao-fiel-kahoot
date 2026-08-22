@@ -82,7 +82,10 @@ async function fetchParticipants() {
           </span>
         </td>
         <td style="text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end;">
-          <button class="btn btn-secondary btn-icon" onclick="openHistoryModal('${p.id}')" title="Ver Extrato">
+          <button class="btn btn-secondary btn-icon" onclick="editParticipantName('${p.id}', '${escapeHtml(p.name)}')" title="Editar Nome">
+            ✏️
+          </button>
+          <button class="btn btn-secondary btn-icon" onclick="openHistoryModal('${p.id}')" title="Ver Extrato e Gerenciar Pontos">
             📜
           </button>
           <button class="btn btn-secondary btn-icon" onclick="printSingleCard('${p.id}')" title="Imprimir Cartão">
@@ -210,11 +213,36 @@ function renderPrintArea(participants) {
   });
 }
 
+let modalActiveParticipantId = null;
+
+// Editar nome do participante (CRUD - Update)
+async function editParticipantName(id, currentName) {
+  const newName = prompt('Editar nome do participante:', currentName);
+  if (newName === null || newName.trim() === '' || newName.trim() === currentName) return;
+  
+  try {
+    const res = await fetch(`/api/participants/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() })
+    });
+    if (res.ok) {
+      fetchParticipants();
+    } else {
+      const err = await res.json();
+      alert(err.error || 'Erro ao atualizar nome');
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 // ==========================================================================
-// MODAL DE DETALHES / HISTÓRICO
+// MODAL DE DETALHES / HISTÓRICO & CRUD DE PONTOS
 // ==========================================================================
 async function openHistoryModal(id) {
   try {
+    modalActiveParticipantId = id;
     const res = await fetch(`/api/participants/${id}`);
     const p = await res.json();
     
@@ -234,12 +262,16 @@ async function openHistoryModal(id) {
         const amtClass = h.amount >= 0 ? 'positive' : 'negative';
         const dateStr = new Date(h.date).toLocaleString('pt-BR');
         return `
-          <div class="transaction-item">
-            <div class="tx-info">
+          <div class="transaction-item" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="tx-info" style="flex: 1; padding-right: 8px;">
               <span class="tx-desc">${escapeHtml(h.description)}</span>
               <span class="tx-date">${dateStr}</span>
             </div>
-            <span class="tx-amount ${amtClass}">${sign}${h.amount}</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="tx-amount ${amtClass}">${sign}${h.amount}</span>
+              <button class="btn btn-secondary btn-icon" style="padding: 0.25rem 0.4rem; font-size: 0.8rem;" onclick="editTransaction('${p.id}', '${h.id}', ${h.amount}, '${escapeHtml(h.description)}')" title="Editar Transação">✏️</button>
+              <button class="btn btn-danger btn-icon" style="padding: 0.25rem 0.4rem; font-size: 0.8rem;" onclick="deleteTransaction('${p.id}', '${h.id}')" title="Excluir Transação">🗑️</button>
+            </div>
           </div>
         `;
       }).join('');
@@ -253,6 +285,98 @@ async function openHistoryModal(id) {
 
 function closeHistoryModal() {
   document.getElementById('history-modal').style.display = 'none';
+  modalActiveParticipantId = null;
+}
+
+// Ajustar saldo direto (CRUD de pontos)
+async function promptSetBalance() {
+  if (!modalActiveParticipantId) return;
+  const newBalStr = prompt('Digite o novo saldo exato para este participante:');
+  if (newBalStr === null) return;
+  const newBal = parseInt(newBalStr);
+  if (isNaN(newBal) || newBal < 0) {
+    alert('Saldo inválido.');
+    return;
+  }
+  const reason = prompt('Motivo do ajuste (opcional):') || `Ajuste manual para ${newBal} pts`;
+  
+  try {
+    const res = await fetch(`/api/participants/${modalActiveParticipantId}/balance`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ balance: newBal, description: reason })
+    });
+    if (res.ok) {
+      openHistoryModal(modalActiveParticipantId);
+      fetchParticipants();
+      playCoinSound();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Zerar saldo do participante
+async function resetParticipantBalance() {
+  if (!modalActiveParticipantId) return;
+  if (!confirm('Deseja realmente zerar todos os pontos deste participante?')) return;
+  
+  try {
+    const res = await fetch(`/api/participants/${modalActiveParticipantId}/balance`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ balance: 0, description: 'Saldo zerado pelo líder' })
+    });
+    if (res.ok) {
+      openHistoryModal(modalActiveParticipantId);
+      fetchParticipants();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Editar transação específica (CRUD de transação)
+async function editTransaction(participantId, txId, currentAmount, currentDesc) {
+  const newAmtStr = prompt('Nova quantidade de pontos (positivo ou negativo):', currentAmount);
+  if (newAmtStr === null) return;
+  const newAmt = parseInt(newAmtStr);
+  if (isNaN(newAmt)) {
+    alert('Quantidade inválida');
+    return;
+  }
+  const newDesc = prompt('Novo motivo:', currentDesc);
+  const finalDesc = (newDesc !== null && newDesc.trim() !== '') ? newDesc.trim() : currentDesc;
+  
+  try {
+    const res = await fetch(`/api/participants/${participantId}/history/${txId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: newAmt, description: finalDesc })
+    });
+    if (res.ok) {
+      openHistoryModal(participantId);
+      fetchParticipants();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Deletar transação específica e recalcular pontos
+async function deleteTransaction(participantId, txId) {
+  if (!confirm('Deseja excluir esta transação do extrato e recalcular o saldo?')) return;
+  try {
+    const res = await fetch(`/api/participants/${participantId}/history/${txId}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      openHistoryModal(participantId);
+      fetchParticipants();
+    }
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 // ==========================================================================

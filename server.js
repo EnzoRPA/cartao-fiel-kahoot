@@ -281,6 +281,108 @@ app.delete('/api/participants/:id', (req, res) => {
   res.json({ success: true, message: 'Participante removido com sucesso' });
 });
 
+// Atualizar nome do participante (CRUD - Update)
+app.put('/api/participants/:id', (req, res) => {
+  const { name } = req.body;
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ error: 'Nome do participante é obrigatório' });
+  }
+
+  const list = readParticipants();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) {
+    return res.status(404).json({ error: 'Participante não encontrado' });
+  }
+
+  participant.name = name.trim();
+  writeParticipants(list);
+  res.json(participant);
+});
+
+// Definir saldo absoluto ou zerar pontos (CRUD - Balance Update)
+app.put('/api/participants/:id/balance', (req, res) => {
+  const { balance, description } = req.body;
+  const newBalance = parseInt(balance);
+
+  if (isNaN(newBalance) || newBalance < 0) {
+    return res.status(400).json({ error: 'Saldo inválido' });
+  }
+
+  const list = readParticipants();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) {
+    return res.status(404).json({ error: 'Participante não encontrado' });
+  }
+
+  const diff = newBalance - participant.credits;
+  participant.credits = newBalance;
+
+  participant.history.unshift({
+    id: 't' + Math.random().toString(36).substr(2, 9),
+    date: new Date().toISOString(),
+    amount: diff,
+    description: description || `Ajuste manual de saldo para ${newBalance} pts`
+  });
+
+  writeParticipants(list);
+  res.json(participant);
+});
+
+// Atualizar uma transação específica (CRUD - Transaction Update)
+app.put('/api/participants/:id/history/:txId', (req, res) => {
+  const { amount, description } = req.body;
+  const newAmount = parseInt(amount);
+
+  if (isNaN(newAmount)) {
+    return res.status(400).json({ error: 'Quantidade de créditos inválida' });
+  }
+
+  const list = readParticipants();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) {
+    return res.status(404).json({ error: 'Participante não encontrado' });
+  }
+
+  const tx = participant.history.find(t => t.id === req.params.txId);
+  if (!tx) {
+    return res.status(404).json({ error: 'Transação não encontrada' });
+  }
+
+  const diff = newAmount - tx.amount;
+  tx.amount = newAmount;
+  if (description) {
+    tx.description = description.trim();
+  }
+
+  participant.credits += diff;
+  if (participant.credits < 0) participant.credits = 0;
+
+  writeParticipants(list);
+  res.json(participant);
+});
+
+// Excluir uma transação específica e estornar os pontos (CRUD - Transaction Delete)
+app.delete('/api/participants/:id/history/:txId', (req, res) => {
+  const list = readParticipants();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) {
+    return res.status(404).json({ error: 'Participante não encontrado' });
+  }
+
+  const txIndex = participant.history.findIndex(t => t.id === req.params.txId);
+  if (txIndex === -1) {
+    return res.status(404).json({ error: 'Transação não encontrada' });
+  }
+
+  const tx = participant.history[txIndex];
+  participant.credits -= tx.amount;
+  if (participant.credits < 0) participant.credits = 0;
+
+  participant.history.splice(txIndex, 1);
+  writeParticipants(list);
+  res.json(participant);
+});
+
 // Adicionar ou retirar créditos
 app.post('/api/participants/:id/credits', (req, res) => {
   const { amount, description } = req.body;
