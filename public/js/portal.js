@@ -374,7 +374,8 @@ async function handleManualTransaction(event) {
   const descInput = document.getElementById('tx-desc');
   
   const amount = parseInt(amountInput.value);
-  const description = descInput.value;
+  const rawDesc = descInput.value.trim();
+  const description = rawDesc !== '' ? rawDesc : (amount >= 0 ? 'Créditos adicionados' : 'Créditos retirados');
   
   if (isNaN(amount) || amount === 0) {
     alert('Insira uma quantidade de créditos válida (positiva ou negativa).');
