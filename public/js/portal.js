@@ -587,6 +587,68 @@ function playCoinSound() {
 }
 
 // ==========================================================================
+// BUSCA RÁPIDA DE PARTICIPANTE NO SCANNER (POR NOME OU ID)
+// ==========================================================================
+let adminCachedParticipants = [];
+
+async function handleAdminSearchInput(query) {
+  const suggestions = document.getElementById('admin-search-suggestions');
+  const cleanQ = query.trim().toLowerCase();
+
+  if (!cleanQ || cleanQ.length === 0) {
+    suggestions.style.display = 'none';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/participants');
+    adminCachedParticipants = await res.json();
+  } catch (e) {
+    console.error(e);
+  }
+
+  const matches = adminCachedParticipants.filter(p => 
+    p.name.toLowerCase().includes(cleanQ) || 
+    p.id.toLowerCase().includes(cleanQ)
+  );
+
+  if (matches.length === 0) {
+    suggestions.innerHTML = `<div style="padding: 0.8rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">Nenhum participante encontrado</div>`;
+  } else {
+    suggestions.innerHTML = matches.map(p => `
+      <div class="suggestion-item" onclick="selectParticipantForAdminScan('${p.id}')" style="padding: 0.6rem 1rem; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <div>
+          <span style="font-weight: 600; color: #fff;">${escapeHtml(p.name)}</span>
+          <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-muted); display: block;">${p.id}</span>
+        </div>
+        <span class="badge-credits" style="font-size: 0.8rem;">💰 ${p.credits} pts</span>
+      </div>
+    `).join('');
+  }
+
+  suggestions.style.display = 'block';
+}
+
+function selectParticipantForAdminScan(id) {
+  const suggestions = document.getElementById('admin-search-suggestions');
+  if (suggestions) suggestions.style.display = 'none';
+  const input = document.getElementById('admin-search-input');
+  if (input) input.value = '';
+
+  loadParticipantDetailsForScan(id);
+  playBeepSound();
+}
+
+// Fechar sugestões ao clicar fora
+document.addEventListener('click', (e) => {
+  const adminInput = document.getElementById('admin-search-input');
+  const adminSuggestions = document.getElementById('admin-search-suggestions');
+  if (adminSuggestions && !adminSuggestions.contains(e.target) && e.target !== adminInput) {
+    adminSuggestions.style.display = 'none';
+  }
+});
+
+// ==========================================================================
 // UTILITÁRIOS
 // ==========================================================================
 function escapeHtml(str) {

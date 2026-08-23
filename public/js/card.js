@@ -1,5 +1,5 @@
 // ==========================================================================
-// CARTEIRA DIGITAL DO ADOLESCENTE - FRONTEND LOGIC
+// CARTEIRA DIGITAL DO ADOLESCENTE - FRONTEND LOGIC (COM BUSCA POR NOME/ID)
 // ==========================================================================
 
 const BIBLE_VERSES = [
@@ -13,51 +13,126 @@ const BIBLE_VERSES = [
   { text: "Os que confiam no Senhor serão como o monte Sião, que não se abala, mas permanece para sempre.", ref: "Salmo 125:1" }
 ];
 
-document.addEventListener("DOMContentLoaded", () => {
+let cachedParticipants = [];
+
+document.addEventListener("DOMContentLoaded", async () => {
+  setupRandomVerse();
+  await loadParticipantsList();
+
   const params = new URLSearchParams(window.location.search);
   const participantId = params.get('id');
 
-  if (!participantId) {
-    document.body.innerHTML = `
-      <div class="wallet-wrapper" style="text-align: center; margin-top: 5rem;">
-        <span style="font-size: 5rem; display: block; margin-bottom: 1.5rem;">⚠️</span>
-        <h2>Cartão Inválido</h2>
-        <p style="color: var(--text-muted); margin-top: 0.5rem;">URL de cartão incompleta. Escaneie o QR Code do seu cartão físico.</p>
-      </div>
-    `;
+  if (participantId) {
+    selectParticipant(participantId, false);
+  } else {
+    showNoParticipantScreen();
+  }
+
+  // Fechar dropdown de sugestões ao clicar fora
+  document.addEventListener('click', (e) => {
+    const searchWrapper = document.getElementById('participant-search-input');
+    const suggestions = document.getElementById('search-suggestions');
+    if (suggestions && !suggestions.contains(e.target) && e.target !== searchWrapper) {
+      suggestions.style.display = 'none';
+    }
+  });
+});
+
+async function loadParticipantsList() {
+  try {
+    const res = await fetch('/api/participants');
+    cachedParticipants = await res.json();
+  } catch (e) {
+    console.error('Erro ao carregar participantes:', e);
+  }
+}
+
+function showNoParticipantScreen() {
+  document.getElementById('card-content-area').style.display = 'none';
+  const noPartScreen = document.getElementById('no-participant-screen');
+  noPartScreen.style.display = 'block';
+
+  const quickList = document.getElementById('participants-quick-list');
+  if (!cachedParticipants || cachedParticipants.length === 0) {
+    quickList.innerHTML = `<div style="color: var(--text-muted); padding: 1rem;">Nenhum adolescente cadastrado ainda.</div>`;
     return;
   }
 
-  loadCardData(participantId);
-  setupRandomVerse();
-});
+  quickList.innerHTML = cachedParticipants.map(p => `
+    <div class="suggestion-item" onclick="selectParticipant('${p.id}', true)" style="border-radius: 8px; background: rgba(255,255,255,0.03);">
+      <div style="text-align: left;">
+        <span style="font-weight: 600; color: #fff;">${escapeHtml(p.name)}</span>
+        <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-muted); display: block;">ID: ${p.id}</span>
+      </div>
+      <span class="badge-credits" style="font-size: 0.85rem;">💰 ${p.credits} pts</span>
+    </div>
+  `).join('');
+}
+
+function handleSearchInput(query) {
+  const suggestions = document.getElementById('search-suggestions');
+  const cleanQ = query.trim().toLowerCase();
+
+  if (!cleanQ || cleanQ.length === 0) {
+    suggestions.style.display = 'none';
+    return;
+  }
+
+  const matches = cachedParticipants.filter(p => 
+    p.name.toLowerCase().includes(cleanQ) || 
+    p.id.toLowerCase().includes(cleanQ)
+  );
+
+  if (matches.length === 0) {
+    suggestions.innerHTML = `<div style="padding: 0.8rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">Nenhum participante encontrado</div>`;
+  } else {
+    suggestions.innerHTML = matches.map(p => `
+      <div class="suggestion-item" onclick="selectParticipant('${p.id}', true)">
+        <div style="text-align: left;">
+          <span style="font-weight: 600; color: #fff;">${escapeHtml(p.name)}</span>
+          <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-muted); display: block;">${p.id}</span>
+        </div>
+        <span class="badge-credits" style="font-size: 0.85rem;">💰 ${p.credits} pts</span>
+      </div>
+    `).join('');
+  }
+
+  suggestions.style.display = 'block';
+}
+
+function selectParticipant(id, updateUrl = true) {
+  const suggestions = document.getElementById('search-suggestions');
+  if (suggestions) suggestions.style.display = 'none';
+
+  const searchInput = document.getElementById('participant-search-input');
+  if (searchInput) searchInput.value = '';
+
+  if (updateUrl) {
+    const newUrl = `${window.location.pathname}?id=${id}`;
+    window.history.pushState({ path: newUrl }, '', newUrl);
+  }
+
+  loadCardData(id);
+}
 
 async function loadCardData(id) {
   try {
-    // 1. Carregar detalhes do participante
+    document.getElementById('no-participant-screen').style.display = 'none';
+    document.getElementById('card-content-area').style.display = 'block';
+
     const res = await fetch(`/api/participants/${id}`);
     if (!res.ok) {
-      document.body.innerHTML = `
-        <div class="wallet-wrapper" style="text-align: center; margin-top: 5rem;">
-          <span style="font-size: 5rem; display: block; margin-bottom: 1.5rem;">🔍</span>
-          <h2>Adolescente não Encontrado</h2>
-          <p style="color: var(--text-muted); margin-top: 0.5rem;">Este cartão pode ter sido removido ou o ID está incorreto.</p>
-        </div>
-      `;
+      showNoParticipantScreen();
+      alert('Participante não encontrado');
       return;
     }
     const p = await res.json();
 
-    // Atualizar Nome
     document.getElementById('card-holder-name').innerText = p.name;
-    
-    // Animar contador de saldo
-    animateCounter('card-credits-val', 0, p.credits, 1200);
+    animateCounter('card-credits-val', 0, p.credits, 1000);
 
-    // 2. Carregar todos para calcular o ranking
     calculateRanking(p.id);
 
-    // Renderizar Histórico
     const historyList = document.getElementById('card-history-list');
     document.getElementById('tx-count').innerText = `${p.history.length} transações`;
 
@@ -91,14 +166,11 @@ async function loadCardData(id) {
 
 async function calculateRanking(activeId) {
   try {
-    const res = await fetch('/api/participants');
-    const list = await res.json();
-    
-    // Ordenar participantes por pontos decrescente
-    list.sort((a, b) => b.credits - a.credits);
-    
-    // Achar o index
-    const index = list.findIndex(item => item.id === activeId);
+    if (!cachedParticipants || cachedParticipants.length === 0) {
+      await loadParticipantsList();
+    }
+    const sorted = [...cachedParticipants].sort((a, b) => b.credits - a.credits);
+    const index = sorted.findIndex(item => item.id === activeId);
     if (index !== -1) {
       const position = index + 1;
       document.getElementById('ranking-badge').innerText = `${position}º Lugar`;
@@ -108,7 +180,6 @@ async function calculateRanking(activeId) {
   }
 }
 
-// Configurar Versículo randômico
 function setupRandomVerse() {
   const randomIndex = Math.floor(Math.random() * BIBLE_VERSES.length);
   const verse = BIBLE_VERSES[randomIndex];
@@ -116,7 +187,6 @@ function setupRandomVerse() {
   document.getElementById('bible-verse-ref').innerText = verse.ref;
 }
 
-// Efeito de contador animado
 function animateCounter(elementId, start, end, duration) {
   const obj = document.getElementById(elementId);
   if (!obj) return;
@@ -139,7 +209,6 @@ function animateCounter(elementId, start, end, duration) {
   window.requestAnimationFrame(step);
 }
 
-// Utilitário de escape de HTML
 function escapeHtml(str) {
   return str.replace(/[&<>'"]/g, 
     tag => ({

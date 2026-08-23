@@ -6,7 +6,6 @@
   <title>Minha Carteira - Cartão Fiel</title>
   <link rel="stylesheet" href="/css/style-portal.css">
   <style>
-    /* Estilos específicos adicionais de animação para a carteira digital */
     .pulse-glow {
       animation: neonGlow 2s infinite alternate;
     }
@@ -18,6 +17,18 @@
         text-shadow: 0 0 20px rgba(139, 92, 246, 0.8), 0 0 30px rgba(236, 72, 153, 0.6);
       }
     }
+    .suggestion-item {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s;
+    }
+    .suggestion-item:hover {
+      background: rgba(139, 92, 246, 0.2);
+    }
   </style>
 </head>
 <body style="padding-bottom: 2rem;">
@@ -25,68 +36,94 @@
   <div class="wallet-wrapper">
     
     <!-- HEADER -->
-    <div style="text-align: center; margin-bottom: 2rem; margin-top: 1rem;">
+    <div style="text-align: center; margin-bottom: 1.5rem; margin-top: 1rem;">
       <h1 style="font-size: 1.8rem; background: linear-gradient(135deg, #c084fc, #db2777); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
         📖 Carteira Digital Fiel
       </h1>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
-        Seus créditos bíblicos em tempo real
+        Consulte seu saldo pelo QR Code, Nome ou Número
       </p>
     </div>
 
-    <!-- CARTÃO VIRTUAL -->
-    <div class="bank-card">
-      <div class="card-top">
-        <span class="card-brand">CARTÃO FIEL</span>
-        <div class="printable-badge" style="background: rgba(255,255,255,0.1); color: var(--text-main); border: 1px solid rgba(255,255,255,0.2);">
-          Bíblia
-        </div>
+    <!-- CAMPO DE BUSCA POR NOME OU ID -->
+    <div style="margin-bottom: 1.5rem; position: relative;">
+      <div style="display: flex; gap: 0.5rem;">
+        <input type="text" id="participant-search-input" class="form-input" placeholder="🔍 Digite seu Nome ou ID do Cartão..." autocomplete="off" oninput="handleSearchInput(this.value)">
       </div>
-      
-      <div class="card-middle">
-        <div class="card-balance-label">Saldo Acumulado</div>
-        <div class="card-balance-val">
-          <span style="font-size: 1.8rem;">💰</span> 
-          <span id="card-credits-val" class="pulse-glow">0</span>
-          <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: 400; margin-left: 5px;">pts</span>
-        </div>
-      </div>
-
-      <div class="card-bottom">
-        <div>
-          <div class="card-balance-label" style="font-size: 0.65rem;">Nome do Fiel</div>
-          <div class="card-holder-name" id="card-holder-name">Carregando...</div>
-        </div>
-        <div class="card-chip"></div>
+      <!-- Sugestões Instantâneas -->
+      <div id="search-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #130a2a; border: 1px solid var(--glass-border); border-radius: 10px; z-index: 100; max-height: 220px; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5); margin-top: 4px;">
       </div>
     </div>
 
-    <!-- CLASSIFICAÇÃO / RANKING -->
-    <div class="glass-card" style="padding: 1.2rem; margin-bottom: 1.5rem; text-align: center; border-color: rgba(252, 211, 77, 0.2);">
-      <h3 style="font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-        🏆 Posição no Ranking: <span id="ranking-badge" style="color: var(--color-accent); font-weight: 800;">Carregando...</span>
-      </h3>
-    </div>
-
-    <!-- HISTÓRICO DE CRÉDITOS -->
-    <div class="glass-card">
-      <div class="history-title">
-        <span>📜 Suas Atividades</span>
-        <span style="font-size: 0.8rem; color: var(--text-muted);" id="tx-count">0 transações</span>
-      </div>
-
-      <div class="transaction-list" id="card-history-list">
+    <!-- TELA DE SELEÇÃO INICIAL (QUANDO NÃO HÁ PARTICIPANTE SELECIONADO) -->
+    <div id="no-participant-screen" class="glass-card" style="display: none; text-align: center; padding: 2rem 1.5rem;">
+      <span style="font-size: 3.5rem; display: block; margin-bottom: 1rem;">👋</span>
+      <h2 style="font-size: 1.3rem; margin-bottom: 0.5rem;">Encontre seu Cartão</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+        Digite seu nome na barra de busca acima ou escolha seu nome na lista abaixo:
+      </p>
+      <div id="participants-quick-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
         <!-- Preenchido via JS -->
-        <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
-          Carregando extrato de pontos...
-        </div>
       </div>
     </div>
 
-    <!-- VERSÍCULO MOTIVACIONAL DO DIA -->
-    <div class="bible-verse-box">
-      <p id="bible-verse-text">"Ninguém despreze a tua mocidade; mas sê o exemplo dos fiéis, na palavra, no trato, no amor, no espírito, na fé, na pureza."</p>
-      <span class="bible-verse-ref" id="bible-verse-ref">1 Timóteo 4:12</span>
+    <!-- ÁREA DO CARTÃO DO PARTICIPANTE -->
+    <div id="card-content-area" style="display: none;">
+      
+      <!-- CARTÃO VIRTUAL -->
+      <div class="bank-card">
+        <div class="card-top">
+          <span class="card-brand">CARTÃO FIEL</span>
+          <div class="printable-badge" style="background: rgba(255,255,255,0.1); color: var(--text-main); border: 1px solid rgba(255,255,255,0.2);">
+            Bíblia
+          </div>
+        </div>
+        
+        <div class="card-middle">
+          <div class="card-balance-label">Saldo Acumulado</div>
+          <div class="card-balance-val">
+            <span style="font-size: 1.8rem;">💰</span> 
+            <span id="card-credits-val" class="pulse-glow">0</span>
+            <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: 400; margin-left: 5px;">pts</span>
+          </div>
+        </div>
+
+        <div class="card-bottom">
+          <div>
+            <div class="card-balance-label" style="font-size: 0.65rem;">Nome do Fiel</div>
+            <div class="card-holder-name" id="card-holder-name">Carregando...</div>
+          </div>
+          <div class="card-chip"></div>
+        </div>
+      </div>
+
+      <!-- CLASSIFICAÇÃO / RANKING -->
+      <div class="glass-card" style="padding: 1.2rem; margin-bottom: 1.5rem; text-align: center; border-color: rgba(252, 211, 77, 0.2);">
+        <h3 style="font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+          🏆 Posição no Ranking: <span id="ranking-badge" style="color: var(--color-accent); font-weight: 800;">Carregando...</span>
+        </h3>
+      </div>
+
+      <!-- HISTÓRICO DE CRÉDITOS -->
+      <div class="glass-card">
+        <div class="history-title">
+          <span>📜 Suas Atividades</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted);" id="tx-count">0 transações</span>
+        </div>
+
+        <div class="transaction-list" id="card-history-list">
+          <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
+            Carregando extrato de pontos...
+          </div>
+        </div>
+      </div>
+
+      <!-- VERSÍCULO MOTIVACIONAL DO DIA -->
+      <div class="bible-verse-box">
+        <p id="bible-verse-text">"Ninguém despreze a tua mocidade; mas sê o exemplo dos fiéis, na palavra, no trato, no amor, no espírito, na fé, na pureza."</p>
+        <span class="bible-verse-ref" id="bible-verse-ref">1 Timóteo 4:12</span>
+      </div>
+
     </div>
 
   </div>

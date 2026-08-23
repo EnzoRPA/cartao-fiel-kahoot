@@ -124,6 +124,16 @@
               <span>❌</span> Desligar Câmera
             </button>
           </div>
+
+          <div style="margin-top: 1.5rem; border-top: 1px solid var(--glass-border); padding-top: 1.2rem;">
+            <label class="form-label" style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+              Ou localize pelo Nome / ID do adolescente:
+            </label>
+            <div style="position: relative;">
+              <input type="text" id="admin-search-input" class="form-input" placeholder="🔍 Digite o nome do participante..." autocomplete="off" oninput="handleAdminSearchInput(this.value)">
+              <div id="admin-search-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #130a2a; border: 1px solid var(--glass-border); border-radius: 10px; z-index: 100; max-height: 180px; overflow-y: auto; margin-top: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.6);"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Painel de Gerenciamento do Crédito -->
