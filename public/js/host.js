@@ -276,9 +276,9 @@ async function handlePasteQuiz(e) {
   let questions;
   try {
     // Tentar JSON primeiro
-    let parsed;
+    let parsed = null;
     try {
-      let cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      let cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
       parsed = JSON.parse(cleaned);
     } catch (e) {
       parsed = null;
@@ -294,33 +294,116 @@ async function handlePasteQuiz(e) {
       }
       questions = parsed.map((q, i) => {
         if (!q.question) throw new Error(`Pergunta ${i + 1}: campo "question" obrigatório.`);
-        if (!Array.isArray(q.options) || q.options.length !== 4) {
-          throw new Error(`Pergunta ${i + 1}: "options" deve ter exatamente 4 itens.`);
+        if (!Array.isArray(q.options) || q.options.length < 2) {
+          throw new Error(`Pergunta ${i + 1}: "options" deve ter pelo menos 2 itens.`);
         }
-        if (q.correctAnswer === undefined || q.correctAnswer < 0 || q.correctAnswer > 3) {
-          throw new Error(`Pergunta ${i + 1}: "correctAnswer" deve ser 0, 1, 2 ou 3.`);
+        // Completar até 4 opções se necessário
+        const opts = [...q.options];
+        while (opts.length < 4) opts.push('');
+
+        // --- Resolver correctAnswer ---
+        // Aceita: número (0,1,2,3), string numérica ("0","1"), ou TEXTO da opção ("Sábado")
+        let ca = -1;
+        const raw = q.correctAnswer;
+
+        if (typeof raw === 'number') {
+          // Número direto: 0, 1, 2, 3
+          ca = raw;
+        } else if (typeof raw === 'string') {
+          // Tentar como número primeiro ("0", "1", "2", "3")
+          const asNum = parseInt(raw);
+          if (!isNaN(asNum) && asNum >= 0 && asNum < q.options.length) {
+            ca = asNum;
+          } else {
+            // Buscar o texto exato dentro de options (case-insensitive, ignorando acentos)
+            const normalize = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const target = normalize(raw);
+            ca = q.options.findIndex(opt => normalize(opt) === target);
+
+            // Se não achou exato, busca parcial (a opção que CONTÉM o texto ou vice-versa)
+            if (ca === -1) {
+              ca = q.options.findIndex(opt => {
+                const n = normalize(opt);
+                return n.includes(target) || target.includes(n);
+              });
+            }
+          }
         }
+
+        if (ca < 0 || ca >= q.options.length) {
+          throw new Error(`Pergunta ${i + 1}: não foi possível encontrar a resposta correta "${raw}" nas opções fornecidas.`);
+        }
+
         return {
           question: q.question,
-          options: q.options,
-          correctAnswer: parseInt(q.correctAnswer),
+          options: opts.slice(0, 4),
+          correctAnswer: ca,
           timeLimit: parseInt(q.timeLimit) || 25
         };
       });
+
     } else {
-      // Formato texto simples (ChatGPT, DeepSeek, etc)
+      // Formato texto simples
       questions = parseTextFormat(rawText);
       if (questions.length === 0) {
-        throw new Error('Não foi possível identificar perguntas no texto. Formatos aceitos: JSON ou lista numerada (1. Pergunta\\nA) Opção\\n✅ Resposta: A).');
+        throw new Error('Não foi possível identificar perguntas no texto.\n\nFormatos aceitos:\n• 1. Pergunta?\nA) Opção\n✅ Resposta: A\n\n• JSON: [{question, options[4], correctAnswer, timeLimit}]');
       }
     }
+
+    // Validação final: verificar se alguma questão tem opções vazias
+    const invalid = questions.findIndex(q => q.options.some(o => !o || !o.trim()));
+    if (invalid >= 0) {
+      throw new Error(`Pergunta ${invalid + 1} tem alternativas em branco. Verifique o formato colado.`);
+    }
+
   } catch (err) {
+    errorDiv.style.whiteSpace = 'pre-line';
     errorDiv.innerText = '❌ ' + err.message;
     errorDiv.style.display = 'block';
     return;
   }
   
-  // Salvar quiz via API
+  // Mostrar preview antes de salvar
+  const previewHtml = questions.map((q, i) => `
+    <div style="background:rgba(0,0,0,0.3);padding:0.8rem;border-radius:8px;margin-bottom:0.5rem;border-left:3px solid #00e5ff;">
+      <div style="font-weight:600;margin-bottom:0.4rem;font-size:0.9rem;">${i+1}. ${escapeHtml(q.question)}</div>
+      ${q.options.map((opt, oi) => `
+        <div style="font-size:0.82rem;padding:2px 0;color:${oi === q.correctAnswer ? '#4ade80' : 'rgba(255,255,255,0.6)'};">
+          ${oi === q.correctAnswer ? '✅' : '◻'} ${['A','B','C','D'][oi]}) ${escapeHtml(opt)}
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  const confirmMsg = `${questions.length} pergunta(s) detectada(s). Verifique as respostas corretas (em verde) e confirme.`;
+  
+  // Criar modal de preview inline no errorDiv como aviso positivo
+  errorDiv.style.whiteSpace = 'normal';
+  errorDiv.style.background = 'rgba(0,100,0,0.3)';
+  errorDiv.style.borderColor = '#4ade80';
+  errorDiv.style.color = '#bbf7d0';
+  errorDiv.innerHTML = `
+    <div style="font-weight:700;margin-bottom:0.8rem;">✅ ${confirmMsg}</div>
+    <div style="max-height:200px;overflow-y:auto;margin-bottom:0.8rem;">${previewHtml}</div>
+    <div style="display:flex;gap:0.5rem;">
+      <button onclick="confirmSaveQuiz(${JSON.stringify(title).replace(/"/g,'&quot;')}, window._pendingQuestions)" 
+        style="flex:1;padding:0.5rem;background:#4ade80;color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;">
+        💾 Confirmar e Salvar
+      </button>
+      <button onclick="document.getElementById('paste-error-msg').style.display='none'" 
+        style="padding:0.5rem 1rem;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;">
+        ✏️ Corrigir
+      </button>
+    </div>
+  `;
+  errorDiv.style.display = 'block';
+  window._pendingQuestions = questions;
+}
+
+async function confirmSaveQuiz(title, questions) {
+  if (!title || !questions || !questions.length) return;
+  window._pendingQuestions = null;
+  
   try {
     await fetch('/api/quizzes', {
       method: 'POST',
@@ -333,72 +416,138 @@ async function handlePasteQuiz(e) {
   
   closeAiModal();
   renderQuizGrid();
-  
-  // Limpar formulário
   document.getElementById('paste-quiz-title').value = '';
   document.getElementById('paste-quiz-json').value = '';
+  document.getElementById('paste-error-msg').style.display = 'none';
 }
 
-// Parser para formato texto simples (1. Pergunta\nA) Opção\n✅ Resposta: B)
+// Parser ROBUSTO para formato texto simples — suporta dezenas de variações
 function parseTextFormat(text) {
   const questions = [];
-  
-  // Dividir por blocos de perguntas (linhas vazias ou números)
-  const blocks = text.split(/\n\s*\n/).filter(b => b.trim());
-  
+
+  // Normalizar: remover \r, trimmar linhas
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Dividir em blocos por linha vazia OU por nova pergunta numerada
+  // Suporta blocos separados por linha em branco
+  const rawBlocks = normalized.split(/\n\s*\n/).filter(b => b.trim());
+
+  // Se só tem 1 bloco mas tem múltiplas perguntas numeradas, dividir por número
+  let blocks = rawBlocks;
+  if (rawBlocks.length === 1) {
+    const multiQ = rawBlocks[0].split(/(?=^\d+[\.\)]\s)/m).filter(b => b.trim());
+    if (multiQ.length > 1) blocks = multiQ;
+  }
+
   for (const block of blocks) {
     const lines = block.trim().split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length < 3) continue;
-    
-    // Extrair texto da pergunta (remover número e ponto)
+    if (lines.length < 2) continue;
+
+    // ── 1. Extrair texto da pergunta ──
     let questionText = '';
-    const questionLine = lines[0];
-    const qMatch = questionLine.match(/^\d+[\.\)]\s*(.+)/);
+    let startLine = 0;
+
+    // Tenta: "1. Pergunta?" ou "1) Pergunta?" ou "Q1: Pergunta?"
+    const qMatch = lines[0].match(/^(?:\d+[\.\)]\s*|Q\d+[\.:]\s*|Pergunta\s*\d+[\.:]\s*)(.+)/i);
     if (qMatch) {
       questionText = qMatch[1].trim();
+      startLine = 1;
+    } else if (lines[0].match(/^\d+$/)) {
+      // Linha só com número, pergunta na próxima
+      questionText = lines[1] || '';
+      startLine = 2;
     } else {
-      questionText = questionLine;
+      questionText = lines[0];
+      startLine = 1;
     }
-    
+
     if (!questionText) continue;
-    
-    // Extrair opções (A, B, C, D)
+
+    // ── 2. Extrair opções e resposta correta ──
     const options = [];
-    let correctIndex = 0;
-    
-    for (let i = 1; i < lines.length; i++) {
+    let correctIndex = -1; // -1 = não encontrado ainda
+    let correctLetter = ''; // letra identificada (A/B/C/D)
+
+    for (let i = startLine; i < lines.length; i++) {
       const line = lines[i];
-      
-      // Verificar se é linha de resposta correta
-      const answerMatch = line.match(/✅\s*Resposta:\s*([A-Da-d])/i);
-      if (answerMatch) {
-        correctIndex = 'ABCD'.indexOf(answerMatch[1].toUpperCase());
+
+      // ── Detectar linha de resposta correta (vários formatos) ──
+
+      // "✅ Resposta: B" / "Resposta: B" / "Resposta correta: B"
+      const ansLineMatch = line.match(/(?:✅\s*)?(?:resposta\s*(?:correta)?|gabarito|answer|correct)[\s:]*([A-Da-d\d])/i);
+      if (ansLineMatch) {
+        const val = ansLineMatch[1].toUpperCase();
+        if ('ABCD'.includes(val)) {
+          correctLetter = val;
+        } else {
+          const num = parseInt(val);
+          if (!isNaN(num) && num >= 1 && num <= 4) correctLetter = 'ABCD'[num - 1];
+        }
         continue;
       }
-      
-      // Extrair opção (A), B), C), D) ou A., B., C., D.)
-      const optMatch = line.match(/^([A-Da-d])[\.\)]\s*(.+)/);
-      if (optMatch && options.length < 4) {
-        options.push(optMatch[2].trim());
+
+      // "✅ B" ou "☑ B" (apenas emoji/marcador + letra)
+      const emojiAnsMatch = line.match(/^(?:✅|☑|✓|✔|→|>)\s*([A-Da-d])[\.\)]?\s*(.*)$/);
+      if (emojiAnsMatch && !emojiAnsMatch[2].trim()) {
+        correctLetter = emojiAnsMatch[1].toUpperCase();
+        continue;
       }
-    }
-    
-    // Se não encontrou resposta marcada com ✅, verificar其他 formatações
-    if (correctIndex === 0 && options.length === 4) {
-      // Procurar por "Resposta: X" sem o ✅
-      for (let i = 1; i < lines.length; i++) {
-        const ansMatch = lines[i].match(/Resposta:\s*([A-Da-d])/i);
-        if (ansMatch) {
-          correctIndex = 'ABCD'.indexOf(ansMatch[1].toUpperCase());
-          break;
+
+      // ── Detectar opção de resposta ──
+
+      // Formato: "A) Texto" / "A. Texto" / "a) Texto" / "(A) Texto"
+      const optMatch = line.match(/^(?:\(([A-Da-d])\)|([A-Da-d])[\.\)])\s*(.+)/);
+      if (optMatch) {
+        const letter = (optMatch[1] || optMatch[2]).toUpperCase();
+        let optText = optMatch[3].trim();
+
+        // Verificar se a opção tem marcação inline de correta
+        const inlineCorrect = optText.match(/^(.+?)\s*(?:✅|☑|✓|✔|\*\*correct\*\*|\(correta?\)|\(correct\))$/i);
+        if (inlineCorrect) {
+          optText = inlineCorrect[1].trim();
+          correctLetter = letter;
+        }
+
+        // Verificar se a linha começa com ✅ antes da letra: "✅ A) Texto"
+        if (line.match(/^✅\s+[A-Da-d][\.\)]/)) {
+          correctLetter = letter;
+        }
+
+        if (options.length < 4) {
+          options.push(optText);
+        }
+        continue;
+      }
+
+      // Formato numérico: "1. Texto" / "1) Texto" como opções
+      if (options.length < 4) {
+        const numOptMatch = line.match(/^([1-4])[\.\)]\s*(.+)/);
+        if (numOptMatch && lines.some(l => l.match(/^[2-4][\.\)]/))) {
+          options.push(numOptMatch[2].trim());
+          continue;
         }
       }
     }
-    
-    if (options.length === 4) {
+
+    // Resolver correctLetter → correctIndex
+    if (correctLetter) {
+      correctIndex = 'ABCD'.indexOf(correctLetter);
+    }
+
+    // Fallback: se não achou resposta, assume 0 mas marca como suspeito
+    if (correctIndex === -1) correctIndex = 0;
+
+    // Precisa ter pelo menos 2 opções
+    if (options.length >= 2) {
+      // Completar até 4 opções se necessário (não deve, mas por segurança)
+      while (options.length < 4) options.push(`Opção ${options.length + 1}`);
+
+      // Garantir que correctIndex não está fora do range
+      if (correctIndex >= options.length) correctIndex = 0;
+
       questions.push({
         question: questionText,
-        options: options,
+        options: options.slice(0, 4),
         correctAnswer: correctIndex,
         timeLimit: 25
       });

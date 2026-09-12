@@ -27,11 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- PERSONALIZAÇÃO DE ABAS ---
-function switchCustomizeTab(tabId) {
+function switchCustomizeTab(tabId, e) {
   document.querySelectorAll('.customize-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.customize-panel').forEach(p => p.classList.remove('active'));
   
-  event.target.classList.add('active');
+  const btn = (e && e.currentTarget) || (e && e.target) || document.querySelector(`[onclick*="${tabId}"]`);
+  if (btn) btn.classList.add('active');
   const panel = document.getElementById(tabId);
   if (panel) panel.classList.add('active');
 }

@@ -8,7 +8,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: RENDER_EXTERNAL_URL
+        value: https://cartao-fiel-kahoot.onrender.com
       - key: SUPABASE_URL
-        sync: false
+        value: https://pluhfzqqxulyniaoghbj.supabase.co
       - key: SUPABASE_KEY
-        sync: false
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsdWhmenFxeHVseW5pYW9naGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMjY0NzUsImV4cCI6MjEwNDgwMjQ3NX0.GbdW30JcExo4qYS64bc6gwRHIv31QjFNIw2Wf5AJ3wg

@@ -68,20 +68,12 @@
         list.innerHTML = ranking.map((player, index) => {
           const medal = index < 3 ? MEDALS[index] : `<span style="color: var(--text-muted); font-weight: 800; min-width: 30px; display: inline-block; text-align: center;">${index + 1}º</span>`;
           const isTop3 = index < 3;
-          const barWidth = ranking[0].credits > 0 
-            ? Math.round((player.credits / ranking[0].credits) * 100) 
-            : 0;
 
           return `
             <div class="leaderboard-item" style="animation-delay: ${index * 0.1}s;">
               <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                 <span style="font-size: 1.5rem; min-width: 40px; text-align: center;">${medal}</span>
-                <div>
-                  <div style="font-family: var(--font-heading); font-weight: 700; font-size: 1.1rem;">${escapeHtml(player.name)}</div>
-                  <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 4px; overflow: hidden;">
-                    <div style="width: ${barWidth}%; height: 100%; background: ${isTop3 ? '#ffea00' : '#00e5ff'}; border-radius: 3px; transition: width 0.5s ease;"></div>
-                  </div>
-                </div>
+                <div style="font-family: var(--font-heading); font-weight: 700; font-size: 1.1rem;">${escapeHtml(player.name)}</div>
               </div>
               <div style="text-align: right;">
                 <div style="color: ${isTop3 ? '#ffea00' : '#00e5ff'}; font-family: var(--font-heading); font-weight: 800; font-size: 1.2rem;">
@@ -91,6 +83,7 @@
             </div>
           `;
         }).join('');
+
 
         // Confetti se tiver jogadores
         if (ranking.length > 0 && typeof confetti === 'function') {

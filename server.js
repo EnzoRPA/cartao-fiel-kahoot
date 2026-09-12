@@ -6,7 +6,6 @@ const os = require('os');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
-const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
@@ -17,17 +16,22 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Supabase (banco de dados externo para persistência)
+// Supabase (banco de dados externo para persistência — opcional)
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const useSupabase = SUPABASE_URL && SUPABASE_KEY;
+const useSupabase = !!(SUPABASE_URL && SUPABASE_KEY);
 let supabase = null;
 
 if (useSupabase) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-  console.log('✅ Supabase conectado com sucesso!');
+  try {
+    const { createClient } = require('@supabase/supabase-js');
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('✅ Supabase conectado com sucesso!');
+  } catch (e) {
+    console.warn('⚠️ @supabase/supabase-js não instalado. Execute: npm install @supabase/supabase-js');
+  }
 } else {
-  console.log('⚠️ Supabase não configurado. Usando JSON local (dados não persistem no Render).');
+  console.log('⚠️ Supabase não configurado. Usando JSON local.');
 }
 
 app.use(express.json());
@@ -192,9 +196,9 @@ app.post('/api/generate-quiz', async (req, res) => {
 ${knowledgeContext ? `=== REFERÊNCIA OBRIGATÓRIA (use APENAS informações daqui) ===\n${knowledgeContext}\n` : ''}=== TEMA ===
 "${topic}"
 
-=== DIFFICULDADE: ${diff.label} (${diff.desc}) ===
+=== DIFICULDADE: ${diff.label} (${diff.desc}) ===
 
-=== REGRAS ESTRTITAS ===
+=== REGRAS ESTRITAS ===
 1. Formato: APENAS JSON válido. Sem markdown, sem explicações.
 2. EXATAMENTE 4 alternativas por pergunta.
 3. APENAS 1 alternativa correta (índice 0-3).
@@ -1192,4 +1196,27 @@ server.listen(PORT, () => {
   console.log(`🏠 Host local:    http://localhost:${PORT}`);
   console.log(`📱 Jogadores QR:  http://${LOCAL_IP}:${PORT}/player.html`);
   console.log(`====================================================`);
+
+  // ============================================================
+  // SELF-PING: Mantém o servidor Render acordado (plano free)
+  // Dispara a cada 14 minutos (Render hiberna após 15 min)
+  // ============================================================
+  const PING_INTERVAL_MS = 14 * 60 * 1000; // 14 minutos
+
+  const selfUrl = process.env.RENDER_EXTERNAL_URL
+    ? `${process.env.RENDER_EXTERNAL_URL}/api/server-info`
+    : `http://localhost:${PORT}/api/server-info`;
+
+  if (process.env.RENDER_EXTERNAL_URL) {
+    console.log(`⏰ Self-ping ativo a cada 14 min → ${selfUrl}`);
+    setInterval(() => {
+      const http = selfUrl.startsWith('https') ? require('https') : require('http');
+      const req = http.get(selfUrl, (res) => {
+        console.log(`🏓 Self-ping OK [${new Date().toLocaleTimeString('pt-BR')}] - Status: ${res.statusCode}`);
+      });
+      req.on('error', (e) => console.warn(`⚠️ Self-ping falhou: ${e.message}`));
+      req.end();
+    }, PING_INTERVAL_MS);
+  }
 });
+
