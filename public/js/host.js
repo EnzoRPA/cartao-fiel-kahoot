@@ -219,41 +219,52 @@ function switchAiTab(tab) {
 function handlePasteQuiz(e) {
   e.preventDefault();
   const title = document.getElementById('paste-quiz-title').value.trim();
-  const jsonStr = document.getElementById('paste-quiz-json').value.trim();
+  const rawText = document.getElementById('paste-quiz-json').value.trim();
   const errorDiv = document.getElementById('paste-error-msg');
   
   errorDiv.style.display = 'none';
   
   let questions;
   try {
-    let parsed = JSON.parse(jsonStr);
-    
-    // Se for um objeto com array "questions" dentro
-    if (parsed.questions && Array.isArray(parsed.questions)) {
-      parsed = parsed.questions;
+    // Tentar JSON primeiro
+    let parsed;
+    try {
+      let cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      parsed = null;
     }
     
-    // Se não for array, erro
-    if (!Array.isArray(parsed)) {
-      throw new Error('O JSON deve ser um array de perguntas.');
+    if (parsed) {
+      // Formato JSON
+      if (parsed.questions && Array.isArray(parsed.questions)) {
+        parsed = parsed.questions;
+      }
+      if (!Array.isArray(parsed)) {
+        throw new Error('O JSON deve ser um array de perguntas.');
+      }
+      questions = parsed.map((q, i) => {
+        if (!q.question) throw new Error(`Pergunta ${i + 1}: campo "question" obrigatório.`);
+        if (!Array.isArray(q.options) || q.options.length !== 4) {
+          throw new Error(`Pergunta ${i + 1}: "options" deve ter exatamente 4 itens.`);
+        }
+        if (q.correctAnswer === undefined || q.correctAnswer < 0 || q.correctAnswer > 3) {
+          throw new Error(`Pergunta ${i + 1}: "correctAnswer" deve ser 0, 1, 2 ou 3.`);
+        }
+        return {
+          question: q.question,
+          options: q.options,
+          correctAnswer: parseInt(q.correctAnswer),
+          timeLimit: parseInt(q.timeLimit) || 25
+        };
+      });
+    } else {
+      // Formato texto simples (ChatGPT, DeepSeek, etc)
+      questions = parseTextFormat(rawText);
+      if (questions.length === 0) {
+        throw new Error('Não foi possível identificar perguntas no texto. Formatos aceitos: JSON ou lista numerada (1. Pergunta\\nA) Opção\\n✅ Resposta: A).');
+      }
     }
-    
-    // Validar cada pergunta
-    questions = parsed.map((q, i) => {
-      if (!q.question) throw new Error(`Pergunta ${i + 1}: campo "question" obrigatório.`);
-      if (!Array.isArray(q.options) || q.options.length !== 4) {
-        throw new Error(`Pergunta ${i + 1}: "options" deve ter exatamente 4 itens.`);
-      }
-      if (q.correctAnswer === undefined || q.correctAnswer < 0 || q.correctAnswer > 3) {
-        throw new Error(`Pergunta ${i + 1}: "correctAnswer" deve ser 0, 1, 2 ou 3.`);
-      }
-      return {
-        question: q.question,
-        options: q.options,
-        correctAnswer: parseInt(q.correctAnswer),
-        timeLimit: parseInt(q.timeLimit) || 25
-      };
-    });
   } catch (err) {
     errorDiv.innerText = '❌ ' + err.message;
     errorDiv.style.display = 'block';
@@ -278,6 +289,75 @@ function handlePasteQuiz(e) {
   // Limpar formulário
   document.getElementById('paste-quiz-title').value = '';
   document.getElementById('paste-quiz-json').value = '';
+}
+
+// Parser para formato texto simples (1. Pergunta\nA) Opção\n✅ Resposta: B)
+function parseTextFormat(text) {
+  const questions = [];
+  
+  // Dividir por blocos de perguntas (linhas vazias ou números)
+  const blocks = text.split(/\n\s*\n/).filter(b => b.trim());
+  
+  for (const block of blocks) {
+    const lines = block.trim().split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 3) continue;
+    
+    // Extrair texto da pergunta (remover número e ponto)
+    let questionText = '';
+    const questionLine = lines[0];
+    const qMatch = questionLine.match(/^\d+[\.\)]\s*(.+)/);
+    if (qMatch) {
+      questionText = qMatch[1].trim();
+    } else {
+      questionText = questionLine;
+    }
+    
+    if (!questionText) continue;
+    
+    // Extrair opções (A, B, C, D)
+    const options = [];
+    let correctIndex = 0;
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Verificar se é linha de resposta correta
+      const answerMatch = line.match(/✅\s*Resposta:\s*([A-Da-d])/i);
+      if (answerMatch) {
+        correctIndex = 'ABCD'.indexOf(answerMatch[1].toUpperCase());
+        continue;
+      }
+      
+      // Extrair opção (A), B), C), D) ou A., B., C., D.)
+      const optMatch = line.match(/^([A-Da-d])[\.\)]\s*(.+)/);
+      if (optMatch && options.length < 4) {
+        options.push(optMatch[2].trim());
+      }
+    }
+    
+    // Se não encontrou resposta marcada com ✅, verificar其他 formatações
+    if (correctIndex === 0 && options.length === 4) {
+      // Procurar por "Resposta: X" sem o ✅
+      for (let i = 1; i < lines.length; i++) {
+        const ansMatch = lines[i].match(/Resposta:\s*([A-Da-d])/i);
+        if (ansMatch) {
+          correctIndex = 'ABCD'.indexOf(ansMatch[1].toUpperCase());
+          break;
+        }
+      }
+    }
+    
+    if (options.length === 4) {
+      questions.push({
+        question: questionText,
+        options: options,
+        correctAnswer: correctIndex,
+        timeLimit: 25
+      });
+    }
+  }
+  
+  return questions;
 }
 
 function openSettingsModal() {

@@ -351,14 +351,17 @@
 
           <div class="form-group">
             <label class="form-label">Cole o JSON abaixo:</label>
-            <textarea id="paste-quiz-json" class="form-input" rows="12" style="font-family: monospace; font-size: 0.85rem; resize: vertical;" placeholder='[
-  {
-    "question": "Qual é a 1ª Crença Fundamental?",
-    "options": ["As Escrituras", "A Trindade", "O Batismo", "A Criação"],
-    "correctAnswer": 0,
-    "timeLimit": 25
-  }
-]' required></textarea>
+            <textarea id="paste-quiz-json" class="form-input" rows="12" style="font-family: monospace; font-size: 0.85rem; resize: vertical;" placeholder='Cole aqui no formato texto:
+
+1. Qual é a 1ª Crença Adventista?
+A) As Escrituras
+B) A Trindade
+C) O Batismo
+D) A Criação
+✅ Resposta: A
+
+Ou no formato JSON:
+[{"question":"Pergunta?","options":["A","B","C","D"],"correctAnswer":0,"timeLimit":25}]' required></textarea>
           </div>
 
           <div id="paste-error-msg" style="display: none; background: rgba(226,27,60,0.3); border: 1px solid #e21b3c; padding: 0.8rem; border-radius: 10px; margin-bottom: 1rem; color: #ffb4c0; font-size: 0.9rem;"></div>
