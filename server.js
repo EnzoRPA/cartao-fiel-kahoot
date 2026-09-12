@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
@@ -15,6 +16,19 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Supabase (banco de dados externo para persistência)
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const useSupabase = SUPABASE_URL && SUPABASE_KEY;
+let supabase = null;
+
+if (useSupabase) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  console.log('✅ Supabase conectado com sucesso!');
+} else {
+  console.log('⚠️ Supabase não configurado. Usando JSON local (dados não persistem no Render).');
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -347,12 +361,11 @@ app.get('/api/server-info', (req, res) => {
 });
 
 // ==========================================================================
-// API DE CRÉDITOS BÍBLICOS & PARTICIPANTES (PERSISTÊNCIA LOCAL JSON)
+// API DE CRÉDITOS BÍBLICOS & PARTICIPANTES
 // ==========================================================================
 
 const PARTICIPANTS_FILE = path.join(__dirname, 'data', 'participants.json');
 
-// Garantir que a pasta e o arquivo existam
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
   fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 }
@@ -360,7 +373,7 @@ if (!fs.existsSync(PARTICIPANTS_FILE)) {
   fs.writeFileSync(PARTICIPANTS_FILE, JSON.stringify([], null, 2), 'utf8');
 }
 
-function readParticipants() {
+function readParticipantsLocal() {
   try {
     const data = fs.readFileSync(PARTICIPANTS_FILE, 'utf8');
     return JSON.parse(data);
@@ -370,7 +383,7 @@ function readParticipants() {
   }
 }
 
-function writeParticipants(data) {
+function writeParticipantsLocal(data) {
   try {
     fs.writeFileSync(PARTICIPANTS_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (e) {
@@ -378,30 +391,60 @@ function writeParticipants(data) {
   }
 }
 
+async function readParticipants() {
+  if (useSupabase) {
+    const { data, error } = await supabase.from('participants').select('*');
+    if (error) { console.error('Erro Supabase readParticipants:', error); return []; }
+    return data.map(p => ({ ...p, history: p.history || [] }));
+  }
+  return readParticipantsLocal();
+}
+
+async function writeParticipants(data) {
+  if (useSupabase) return;
+  writeParticipantsLocal(data);
+}
+
+async function upsertParticipant(participant) {
+  if (useSupabase) {
+    const { error } = await supabase.from('participants').upsert(participant, { onConflict: 'id' });
+    if (error) console.error('Erro Supabase upsert:', error);
+  }
+}
+
+async function deleteParticipantDb(id) {
+  if (useSupabase) {
+    const { error } = await supabase.from('participants').delete().eq('id', id);
+    if (error) console.error('Erro Supabase delete:', error);
+  }
+}
+
 // Obter todos os participantes
-app.get('/api/participants', (req, res) => {
-  const list = readParticipants();
+app.get('/api/participants', async (req, res) => {
+  const list = await readParticipants();
   res.json(list);
 });
 
 // Obter dados de um participante específico
-app.get('/api/participants/:id', (req, res) => {
-  const list = readParticipants();
-  const participant = list.find(p => p.id === req.params.id);
-  if (!participant) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
+app.get('/api/participants/:id', async (req, res) => {
+  if (useSupabase) {
+    const { data, error } = await supabase.from('participants').select('*').eq('id', req.params.id).single();
+    if (error || !data) return res.status(404).json({ error: 'Participante não encontrado' });
+    return res.json({ ...data, history: data.history || [] });
   }
+  const list = readParticipantsLocal();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) return res.status(404).json({ error: 'Participante não encontrado' });
   res.json(participant);
 });
 
 // Adicionar novo participante
-app.post('/api/participants', (req, res) => {
+app.post('/api/participants', async (req, res) => {
   const { name } = req.body;
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Nome do participante é obrigatório' });
   }
 
-  const list = readParticipants();
   const newParticipant = {
     id: 'p' + Math.random().toString(36).substr(2, 9),
     name: name.trim(),
@@ -409,156 +452,191 @@ app.post('/api/participants', (req, res) => {
     history: []
   };
 
-  list.push(newParticipant);
-  writeParticipants(list);
+  if (useSupabase) {
+    await upsertParticipant(newParticipant);
+  } else {
+    const list = readParticipantsLocal();
+    list.push(newParticipant);
+    writeParticipantsLocal(list);
+  }
   res.status(201).json(newParticipant);
 });
 
 // Remover participante
-app.delete('/api/participants/:id', (req, res) => {
-  let list = readParticipants();
-  const index = list.findIndex(p => p.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
+app.delete('/api/participants/:id', async (req, res) => {
+  if (useSupabase) {
+    const { error } = await supabase.from('participants').delete().eq('id', req.params.id);
+    if (error) return res.status(404).json({ error: 'Participante não encontrado' });
+    return res.json({ success: true, message: 'Participante removido com sucesso' });
   }
-
+  let list = readParticipantsLocal();
+  const index = list.findIndex(p => p.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Participante não encontrado' });
   list.splice(index, 1);
-  writeParticipants(list);
+  writeParticipantsLocal(list);
   res.json({ success: true, message: 'Participante removido com sucesso' });
 });
 
-// Atualizar nome do participante (CRUD - Update)
-app.put('/api/participants/:id', (req, res) => {
+// Atualizar nome do participante
+app.put('/api/participants/:id', async (req, res) => {
   const { name } = req.body;
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Nome do participante é obrigatório' });
   }
 
-  const list = readParticipants();
-  const participant = list.find(p => p.id === req.params.id);
-  if (!participant) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
+  if (useSupabase) {
+    const { data, error } = await supabase.from('participants').update({ name: name.trim() }).eq('id', req.params.id).select().single();
+    if (error || !data) return res.status(404).json({ error: 'Participante não encontrado' });
+    return res.json(data);
   }
 
+  const list = readParticipantsLocal();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) return res.status(404).json({ error: 'Participante não encontrado' });
   participant.name = name.trim();
-  writeParticipants(list);
+  writeParticipantsLocal(list);
   res.json(participant);
 });
 
-// Definir saldo absoluto ou zerar pontos (CRUD - Balance Update)
-app.put('/api/participants/:id/balance', (req, res) => {
+// Definir saldo absoluto
+app.put('/api/participants/:id/balance', async (req, res) => {
   const { balance, description } = req.body;
   const newBalance = parseInt(balance);
-
   if (isNaN(newBalance) || newBalance < 0) {
     return res.status(400).json({ error: 'Saldo inválido' });
   }
 
-  const list = readParticipants();
-  const participant = list.find(p => p.id === req.params.id);
-  if (!participant) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
+  if (useSupabase) {
+    const { data: participant, error } = await supabase.from('participants').select('*').eq('id', req.params.id).single();
+    if (error || !participant) return res.status(404).json({ error: 'Participante não encontrado' });
+
+    const diff = newBalance - participant.credits;
+    const history = participant.history || [];
+    history.unshift({
+      id: 't' + Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString(),
+      amount: diff,
+      description: description || `Ajuste manual de saldo para ${newBalance} pts`
+    });
+
+    const { error: upErr } = await supabase.from('participants').update({ credits: newBalance, history }).eq('id', req.params.id);
+    if (upErr) console.error(upErr);
+    return res.json({ ...participant, credits: newBalance, history });
   }
 
+  const list = readParticipantsLocal();
+  const participant = list.find(p => p.id === req.params.id);
+  if (!participant) return res.status(404).json({ error: 'Participante não encontrado' });
   const diff = newBalance - participant.credits;
   participant.credits = newBalance;
-
   participant.history.unshift({
     id: 't' + Math.random().toString(36).substr(2, 9),
     date: new Date().toISOString(),
     amount: diff,
     description: description || `Ajuste manual de saldo para ${newBalance} pts`
   });
-
-  writeParticipants(list);
+  writeParticipantsLocal(list);
   res.json(participant);
 });
 
-// Atualizar uma transação específica (CRUD - Transaction Update)
-app.put('/api/participants/:id/history/:txId', (req, res) => {
+// Atualizar uma transação específica
+app.put('/api/participants/:id/history/:txId', async (req, res) => {
   const { amount, description } = req.body;
   const newAmount = parseInt(amount);
+  if (isNaN(newAmount)) return res.status(400).json({ error: 'Quantidade de créditos inválida' });
 
-  if (isNaN(newAmount)) {
-    return res.status(400).json({ error: 'Quantidade de créditos inválida' });
+  if (useSupabase) {
+    const { data: participant, error } = await supabase.from('participants').select('*').eq('id', req.params.id).single();
+    if (error || !participant) return res.status(404).json({ error: 'Participante não encontrado' });
+    const history = participant.history || [];
+    const tx = history.find(t => t.id === req.params.txId);
+    if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
+    const diff = newAmount - tx.amount;
+    tx.amount = newAmount;
+    if (description) tx.description = description.trim();
+    let credits = participant.credits + diff;
+    if (credits < 0) credits = 0;
+    await supabase.from('participants').update({ credits, history }).eq('id', req.params.id);
+    return res.json({ ...participant, credits, history });
   }
 
-  const list = readParticipants();
+  const list = readParticipantsLocal();
   const participant = list.find(p => p.id === req.params.id);
-  if (!participant) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
-  }
-
+  if (!participant) return res.status(404).json({ error: 'Participante não encontrado' });
   const tx = participant.history.find(t => t.id === req.params.txId);
-  if (!tx) {
-    return res.status(404).json({ error: 'Transação não encontrada' });
-  }
-
+  if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
   const diff = newAmount - tx.amount;
   tx.amount = newAmount;
-  if (description) {
-    tx.description = description.trim();
-  }
-
+  if (description) tx.description = description.trim();
   participant.credits += diff;
   if (participant.credits < 0) participant.credits = 0;
-
-  writeParticipants(list);
+  writeParticipantsLocal(list);
   res.json(participant);
 });
 
-// Excluir uma transação específica e estornar os pontos (CRUD - Transaction Delete)
-app.delete('/api/participants/:id/history/:txId', (req, res) => {
-  const list = readParticipants();
+// Excluir uma transação específica e estornar os pontos
+app.delete('/api/participants/:id/history/:txId', async (req, res) => {
+  if (useSupabase) {
+    const { data: participant, error } = await supabase.from('participants').select('*').eq('id', req.params.id).single();
+    if (error || !participant) return res.status(404).json({ error: 'Participante não encontrado' });
+    const history = participant.history || [];
+    const txIndex = history.findIndex(t => t.id === req.params.txId);
+    if (txIndex === -1) return res.status(404).json({ error: 'Transação não encontrada' });
+    const tx = history[txIndex];
+    let credits = participant.credits - tx.amount;
+    if (credits < 0) credits = 0;
+    history.splice(txIndex, 1);
+    await supabase.from('participants').update({ credits, history }).eq('id', req.params.id);
+    return res.json({ ...participant, credits, history });
+  }
+
+  const list = readParticipantsLocal();
   const participant = list.find(p => p.id === req.params.id);
-  if (!participant) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
-  }
-
+  if (!participant) return res.status(404).json({ error: 'Participante não encontrado' });
   const txIndex = participant.history.findIndex(t => t.id === req.params.txId);
-  if (txIndex === -1) {
-    return res.status(404).json({ error: 'Transação não encontrada' });
-  }
-
+  if (txIndex === -1) return res.status(404).json({ error: 'Transação não encontrada' });
   const tx = participant.history[txIndex];
   participant.credits -= tx.amount;
   if (participant.credits < 0) participant.credits = 0;
-
   participant.history.splice(txIndex, 1);
-  writeParticipants(list);
+  writeParticipantsLocal(list);
   res.json(participant);
 });
 
 // Adicionar ou retirar créditos
-app.post('/api/participants/:id/credits', (req, res) => {
+app.post('/api/participants/:id/credits', async (req, res) => {
   const { amount, description } = req.body;
   const creditAmount = parseInt(amount);
+  if (isNaN(creditAmount)) return res.status(400).json({ error: 'Quantidade de créditos inválida' });
 
-  if (isNaN(creditAmount)) {
-    return res.status(400).json({ error: 'Quantidade de créditos inválida' });
+  if (useSupabase) {
+    const { data: participant, error } = await supabase.from('participants').select('*').eq('id', req.params.id).single();
+    if (error || !participant) return res.status(404).json({ error: 'Participante não encontrado' });
+    let credits = participant.credits + creditAmount;
+    if (credits < 0) credits = 0;
+    const history = participant.history || [];
+    history.unshift({
+      id: 't' + Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString(),
+      amount: creditAmount,
+      description: description || (creditAmount >= 0 ? 'Créditos adicionados' : 'Créditos retirados')
+    });
+    await supabase.from('participants').update({ credits, history }).eq('id', req.params.id);
+    return res.json({ ...participant, credits, history });
   }
 
-  const list = readParticipants();
+  const list = readParticipantsLocal();
   const participant = list.find(p => p.id === req.params.id);
-  if (!participant) {
-    return res.status(404).json({ error: 'Participante não encontrado' });
-  }
-
+  if (!participant) return res.status(404).json({ error: 'Participante não encontrado' });
   participant.credits += creditAmount;
-  // Impedir saldo negativo se for o caso
-  if (participant.credits < 0) {
-    participant.credits = 0;
-  }
-
-  // Adicionar ao histórico de transações
+  if (participant.credits < 0) participant.credits = 0;
   participant.history.unshift({
     id: 't' + Math.random().toString(36).substr(2, 9),
     date: new Date().toISOString(),
     amount: creditAmount,
     description: description || (creditAmount >= 0 ? 'Créditos adicionados' : 'Créditos retirados')
   });
-
-  writeParticipants(list);
+  writeParticipantsLocal(list);
   res.json(participant);
 });
 
@@ -567,9 +645,9 @@ app.get('/api/server-ip', (req, res) => {
   res.json({ ip: LOCAL_IP, port: PORT });
 });
 
-// API de Ranking - Retorna participantes ordenados por pontuação
-app.get('/api/ranking', (req, res) => {
-  const list = readParticipants();
+// API de Ranking
+app.get('/api/ranking', async (req, res) => {
+  const list = await readParticipants();
   const ranking = list
     .map(p => ({
       id: p.id,
@@ -577,21 +655,19 @@ app.get('/api/ranking', (req, res) => {
       credits: p.credits
     }))
     .sort((a, b) => b.credits - a.credits);
-  
   res.json(ranking);
 });
 
 // ==========================================================================
-// API DE QUIZZES (CRUD - Persistência em JSON)
+// API DE QUIZZES (CRUD)
 // ==========================================================================
 
 const QUIZZES_FILE = path.join(__dirname, 'data', 'quizzes.json');
-
 if (!fs.existsSync(QUIZZES_FILE)) {
   fs.writeFileSync(QUIZZES_FILE, JSON.stringify([], null, 2), 'utf8');
 }
 
-function readQuizzes() {
+function readQuizzesLocal() {
   try {
     const data = fs.readFileSync(QUIZZES_FILE, 'utf8');
     return JSON.parse(data);
@@ -601,7 +677,7 @@ function readQuizzes() {
   }
 }
 
-function writeQuizzes(data) {
+function writeQuizzesLocal(data) {
   try {
     fs.writeFileSync(QUIZZES_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (e) {
@@ -609,74 +685,82 @@ function writeQuizzes(data) {
   }
 }
 
-// Listar todos os quizzes
-app.get('/api/quizzes', (req, res) => {
-  const quizzes = readQuizzes();
-  res.json(quizzes);
+async function readQuizzes() {
+  if (useSupabase) {
+    const { data, error } = await supabase.from('quizzes').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Erro Supabase readQuizzes:', error); return []; }
+    return data.map(q => ({ id: q.id, title: q.title, questions: q.questions || [] }));
+  }
+  return readQuizzesLocal();
+}
+
+app.get('/api/quizzes', async (req, res) => {
+  res.json(await readQuizzes());
 });
 
-// Obter um quiz específico
-app.get('/api/quizzes/:id', (req, res) => {
-  const quizzes = readQuizzes();
-  const quiz = quizzes.find(q => q.id === req.params.id);
-  if (!quiz) {
-    return res.status(404).json({ error: 'Quiz não encontrado' });
+app.get('/api/quizzes/:id', async (req, res) => {
+  if (useSupabase) {
+    const { data, error } = await supabase.from('quizzes').select('*').eq('id', req.params.id).single();
+    if (error || !data) return res.status(404).json({ error: 'Quiz não encontrado' });
+    return res.json({ id: data.id, title: data.title, questions: data.questions || [] });
   }
+  const quizzes = readQuizzesLocal();
+  const quiz = quizzes.find(q => q.id === req.params.id);
+  if (!quiz) return res.status(404).json({ error: 'Quiz não encontrado' });
   res.json(quiz);
 });
 
-// Criar novo quiz
-app.post('/api/quizzes', (req, res) => {
+app.post('/api/quizzes', async (req, res) => {
   const { title, questions } = req.body;
-  if (!title || !title.trim()) {
-    return res.status(400).json({ error: 'Título é obrigatório' });
-  }
-  if (!Array.isArray(questions) || questions.length === 0) {
-    return res.status(400).json({ error: 'Quiz deve ter pelo menos 1 pergunta' });
-  }
+  if (!title || !title.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
+  if (!Array.isArray(questions) || questions.length === 0) return res.status(400).json({ error: 'Quiz deve ter pelo menos 1 pergunta' });
 
-  const newQuiz = {
-    id: 'quiz-' + Date.now(),
-    title: title.trim(),
-    questions
-  };
+  const newQuiz = { id: 'quiz-' + Date.now(), title: title.trim(), questions };
 
-  const quizzes = readQuizzes();
-  quizzes.unshift(newQuiz);
-  writeQuizzes(quizzes);
+  if (useSupabase) {
+    const { error } = await supabase.from('quizzes').insert({ id: newQuiz.id, title: newQuiz.title, questions: newQuiz.questions });
+    if (error) console.error('Erro Supabase insert quiz:', error);
+  } else {
+    const quizzes = readQuizzesLocal();
+    quizzes.unshift(newQuiz);
+    writeQuizzesLocal(quizzes);
+  }
   res.status(201).json(newQuiz);
 });
 
-// Atualizar quiz existente
-app.put('/api/quizzes/:id', (req, res) => {
+app.put('/api/quizzes/:id', async (req, res) => {
   const { title, questions } = req.body;
-  const quizzes = readQuizzes();
+
+  if (useSupabase) {
+    const updates = {};
+    if (title) updates.title = title.trim();
+    if (Array.isArray(questions) && questions.length > 0) updates.questions = questions;
+    const { data, error } = await supabase.from('quizzes').update(updates).eq('id', req.params.id).select().single();
+    if (error || !data) return res.status(404).json({ error: 'Quiz não encontrado' });
+    return res.json({ id: data.id, title: data.title, questions: data.questions });
+  }
+
+  const quizzes = readQuizzesLocal();
   const quiz = quizzes.find(q => q.id === req.params.id);
-  
-  if (!quiz) {
-    return res.status(404).json({ error: 'Quiz não encontrado' });
-  }
-
+  if (!quiz) return res.status(404).json({ error: 'Quiz não encontrado' });
   if (title) quiz.title = title.trim();
-  if (Array.isArray(questions) && questions.length > 0) {
-    quiz.questions = questions;
-  }
-
-  writeQuizzes(quizzes);
+  if (Array.isArray(questions) && questions.length > 0) quiz.questions = questions;
+  writeQuizzesLocal(quizzes);
   res.json(quiz);
 });
 
-// Excluir quiz
-app.delete('/api/quizzes/:id', (req, res) => {
-  let quizzes = readQuizzes();
-  const index = quizzes.findIndex(q => q.id === req.params.id);
-  
-  if (index === -1) {
-    return res.status(404).json({ error: 'Quiz não encontrado' });
+app.delete('/api/quizzes/:id', async (req, res) => {
+  if (useSupabase) {
+    const { error } = await supabase.from('quizzes').delete().eq('id', req.params.id);
+    if (error) return res.status(404).json({ error: 'Quiz não encontrado' });
+    return res.json({ success: true, message: 'Quiz excluído com sucesso' });
   }
 
+  let quizzes = readQuizzesLocal();
+  const index = quizzes.findIndex(q => q.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Quiz não encontrado' });
   quizzes.splice(index, 1);
-  writeQuizzes(quizzes);
+  writeQuizzesLocal(quizzes);
   res.json({ success: true, message: 'Quiz excluído com sucesso' });
 });
 
@@ -1011,11 +1095,11 @@ function processQuestionReveal(room) {
   });
 }
 
-function sendGameOver(room) {
+async function sendGameOver(room) {
   const leaderboard = getLeaderboard(room);
 
   // Salvar pontos dos jogadores nos participantes
-  saveGamePointsToUsers(room);
+  await saveGamePointsToUsers(room);
 
   io.to(room.hostSocketId).emit('game-over-host', {
     podium: leaderboard.slice(0, 3),
@@ -1035,8 +1119,35 @@ function sendGameOver(room) {
   });
 }
 
-function saveGamePointsToUsers(room) {
-  // Agrupar pontuação por usuário (caso o mesmo usuário jogue várias vezes no mesmo jogo)
+async function saveGamePointsToUsers(room) {
+  if (useSupabase) {
+    const userScores = {};
+    Object.values(room.players).forEach(player => {
+      if (player.userId) {
+        if (!userScores[player.userId]) {
+          userScores[player.userId] = { nickname: player.nickname, totalScore: 0 };
+        }
+        userScores[player.userId].totalScore += player.score;
+      }
+    });
+
+    for (const [userId, data] of Object.entries(userScores)) {
+      const { data: participant } = await supabase.from('participants').select('*').eq('id', userId).single();
+      if (participant) {
+        const credits = participant.credits + data.totalScore;
+        const history = participant.history || [];
+        history.unshift({
+          id: 't' + Math.random().toString(36).substr(2, 9),
+          date: new Date().toISOString(),
+          amount: data.totalScore,
+          description: `Pontos do Kahoot (${room.quiz.title || 'Quiz'})`
+        });
+        await supabase.from('participants').update({ credits, history }).eq('id', userId);
+      }
+    }
+    return;
+  }
+
   const userScores = {};
   Object.values(room.players).forEach(player => {
     if (player.userId) {
@@ -1047,15 +1158,11 @@ function saveGamePointsToUsers(room) {
     }
   });
 
-  // Salvar no arquivo de participantes
-  const list = readParticipants();
-  
+  const list = readParticipantsLocal();
   for (const [userId, data] of Object.entries(userScores)) {
     const participant = list.find(p => p.id === userId);
     if (participant) {
-      const newCredits = participant.credits + data.totalScore;
-      
-      participant.credits = newCredits;
+      participant.credits += data.totalScore;
       participant.history.unshift({
         id: 't' + Math.random().toString(36).substr(2, 9),
         date: new Date().toISOString(),
@@ -1064,8 +1171,7 @@ function saveGamePointsToUsers(room) {
       });
     }
   }
-  
-  writeParticipants(list);
+  writeParticipantsLocal(list);
 }
 
 function getLeaderboard(room) {
