@@ -34,15 +34,18 @@ function switchTab(tabId) {
   
   document.getElementById(tabId).classList.add('active');
   
-  // Achar o botão correspondente e ativar
   const matchingBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
     btn.getAttribute('onclick').includes(tabId)
   );
   if (matchingBtn) matchingBtn.classList.add('active');
   
-  // Desligar câmera ao mudar de aba
   if (tabId !== 'tab-scan' && html5QrcodeScanner) {
     stopScanner();
+  }
+
+  // Carregar cards de acesso rápido ao abrir aba de scan
+  if (tabId === 'tab-scan') {
+    loadQuickParticipants();
   }
 }
 
@@ -523,10 +526,9 @@ async function makeTransaction(id, amount, description) {
     
     if (res.ok) {
       playCoinSound();
-      // Recarregar painel do scan
       loadParticipantDetailsForScan(id);
-      // Recarregar a lista geral caso o admin volte pra aba de participantes
       fetchParticipants();
+      loadQuickParticipants(); // Atualizar saldos nos cards rápidos
       return true;
     } else {
       const err = await res.json();
@@ -537,6 +539,106 @@ async function makeTransaction(id, amount, description) {
     console.error(e);
     return false;
   }
+}
+
+// ==========================================================================
+// ACESSO RÁPIDO: CARDS DE PARTICIPANTES COM CRÉDITO DE 1 CLIQUE
+// ==========================================================================
+async function loadQuickParticipants() {
+  const grid = document.getElementById('quick-participants-grid');
+  if (!grid) return;
+
+  try {
+    const res = await fetch('/api/participants');
+    const list = await res.json();
+    adminCachedParticipants = list;
+
+    if (list.length === 0) {
+      grid.innerHTML = `<div style="text-align:center; color: var(--text-muted); padding: 1.5rem; grid-column: 1/-1;">Nenhum participante cadastrado ainda.</div>`;
+      return;
+    }
+
+    grid.innerHTML = list.map(p => `
+      <div id="qcard-${p.id}" style="
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 14px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+      " onmouseenter="this.style.borderColor='#a78bfa'" onmouseleave="this.style.borderColor='rgba(255,255,255,0.1)'">
+        <!-- Cabeçalho do card -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;" onclick="selectParticipantForAdminScan('${p.id}')">
+          <span style="font-weight: 700; font-size: 1rem; color: #fff;">${escapeHtml(p.name)}</span>
+          <span style="background: rgba(255,234,0,0.15); color: #ffea00; font-weight: 700; font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 20px; white-space: nowrap;">
+            💰 <span id="qcard-balance-${p.id}">${p.credits}</span> pts
+          </span>
+        </div>
+        <!-- Botões de crédito rápido -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.4rem;">
+          <button onclick="quickCredit('${p.id}', 5, 'Presença no estudo')" style="
+            padding: 0.4rem 0;
+            background: rgba(74,222,128,0.15);
+            border: 1px solid rgba(74,222,128,0.3);
+            color: #4ade80;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s;
+          " onmouseenter="this.style.background='rgba(74,222,128,0.3)'" onmouseleave="this.style.background='rgba(74,222,128,0.15)'">+5</button>
+          <button onclick="quickCredit('${p.id}', 10, 'Participação na aula')" style="
+            padding: 0.4rem 0;
+            background: rgba(74,222,128,0.15);
+            border: 1px solid rgba(74,222,128,0.3);
+            color: #4ade80;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s;
+          " onmouseenter="this.style.background='rgba(74,222,128,0.3)'" onmouseleave="this.style.background='rgba(74,222,128,0.15)'">+10</button>
+          <button onclick="quickCredit('${p.id}', 20, 'Acertou dinâmica bíblica')" style="
+            padding: 0.4rem 0;
+            background: rgba(74,222,128,0.15);
+            border: 1px solid rgba(74,222,128,0.3);
+            color: #4ade80;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s;
+          " onmouseenter="this.style.background='rgba(74,222,128,0.3)'" onmouseleave="this.style.background='rgba(74,222,128,0.15)'">+20</button>
+          <button onclick="quickCredit('${p.id}', 50, 'Decorou verso bíblico')" style="
+            padding: 0.4rem 0;
+            background: rgba(74,222,128,0.15);
+            border: 1px solid rgba(74,222,128,0.3);
+            color: #4ade80;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s;
+          " onmouseenter="this.style.background='rgba(74,222,128,0.3)'" onmouseleave="this.style.background='rgba(74,222,128,0.15)'">+50</button>
+        </div>
+      </div>
+    `).join('');
+
+  } catch (e) {
+    console.error('Erro ao carregar acesso rápido:', e);
+  }
+}
+
+async function quickCredit(id, amount, description) {
+  // Feedback visual instantâneo no saldo
+  const balEl = document.getElementById(`qcard-balance-${id}`);
+  if (balEl) {
+    const prev = parseInt(balEl.innerText) || 0;
+    balEl.innerText = prev + amount;
+    balEl.style.color = '#4ade80';
+    setTimeout(() => balEl.style.color = '', 800);
+  }
+  await makeTransaction(id, amount, description);
 }
 
 // ==========================================================================
