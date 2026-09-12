@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking - Kahoot IA</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+</head>
+<body class="player-body">
+
+  <main class="player-card" style="max-width: 550px;">
+
+    <!-- HEADER -->
+    <div class="glass-card" style="text-align: center; padding: 1.5rem 1.5rem 1rem 1.5rem; margin-bottom: 1.5rem;">
+      <div class="brand-logo" style="justify-content: center; font-size: 2rem; margin-bottom: 0.5rem;">
+        <span>🏆</span> RANKING <span style="color:#ffea00">GERAL</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">Classificação dos jogadores por pontuação total</p>
+    </div>
+
+    <!-- LISTA DO RANKING -->
+    <div class="glass-card" style="padding: 1.5rem;">
+      <div id="ranking-list" class="leaderboard-list">
+        <!-- Preenchido via JavaScript -->
+      </div>
+
+      <div id="loading-indicator" style="text-align: center; padding: 3rem;">
+        <div style="font-size: 3rem; animation: pulse 1s infinite alternate;">⏳</div>
+        <p style="color: var(--text-muted); margin-top: 1rem;">Carregando ranking...</p>
+      </div>
+
+      <div id="empty-state" style="display: none; text-align: center; padding: 3rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📭</div>
+        <h3 style="font-family: var(--font-heading); margin-bottom: 0.5rem;">Nenhum jogador ainda</h3>
+        <p style="color: var(--text-muted);">Jogue um quiz para aparecer no ranking!</p>
+      </div>
+    </div>
+
+    <!-- BOTÃO VOLTAR -->
+    <div style="text-align: center; margin-top: 1.5rem;">
+      <a href="/" class="btn btn-primary btn-lg" style="width: 100%;">
+        <span>🏠</span> Voltar ao Início
+      </a>
+    </div>
+
+  </main>
+
+  <script>
+    const MEDALS = ['🥇', '🥈', '🥉'];
+
+    async function loadRanking() {
+      try {
+        const response = await fetch('/api/ranking');
+        const ranking = await response.json();
+
+        const loading = document.getElementById('loading-indicator');
+        const list = document.getElementById('ranking-list');
+        const emptyState = document.getElementById('empty-state');
+
+        loading.style.display = 'none';
+
+        if (ranking.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        list.innerHTML = ranking.map((player, index) => {
+          const medal = index < 3 ? MEDALS[index] : `<span style="color: var(--text-muted); font-weight: 800; min-width: 30px; display: inline-block; text-align: center;">${index + 1}º</span>`;
+          const isTop3 = index < 3;
+          const barWidth = ranking[0].credits > 0 
+            ? Math.round((player.credits / ranking[0].credits) * 100) 
+            : 0;
+
+          return `
+            <div class="leaderboard-item" style="animation-delay: ${index * 0.1}s;">
+              <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                <span style="font-size: 1.5rem; min-width: 40px; text-align: center;">${medal}</span>
+                <div>
+                  <div style="font-family: var(--font-heading); font-weight: 700; font-size: 1.1rem;">${escapeHtml(player.name)}</div>
+                  <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 4px; overflow: hidden;">
+                    <div style="width: ${barWidth}%; height: 100%; background: ${isTop3 ? '#ffea00' : '#00e5ff'}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="color: ${isTop3 ? '#ffea00' : '#00e5ff'}; font-family: var(--font-heading); font-weight: 800; font-size: 1.2rem;">
+                  ${player.credits.toLocaleString('pt-BR')} pts
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Confetti se tiver jogadores
+        if (ranking.length > 0 && typeof confetti === 'function') {
+          setTimeout(() => {
+            confetti({ particleCount: 80, spread: 60, origin: { y: 0.3 } });
+          }, 500);
+        }
+
+      } catch (error) {
+        console.error('Erro ao carregar ranking:', error);
+        document.getElementById('loading-indicator').innerHTML = `
+          <div style="font-size: 3rem;">❌</div>
+          <p style="color: var(--kahoot-red); margin-top: 1rem;">Erro ao carregar ranking</p>
+        `;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      })[m]);
+    }
+
+    // Carregar ranking ao abrir a página
+    document.addEventListener('DOMContentLoaded', loadRanking);
+
+    // Atualizar automaticamente a cada 30 segundos
+    setInterval(loadRanking, 30000);
+  </script>
+
+</body>
+</html>
