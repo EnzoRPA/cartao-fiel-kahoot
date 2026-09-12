@@ -9,13 +9,6 @@ let selectedUsername = '';
 let currentPin = null;
 let avatarInitialized = false;
 
-// USUÁRIOS FIXOS (IDs devem corresponder ao participants.json)
-const USERS = {
-  'Dalessandro': { defaultAvatar: '🧒', id: 'pl4hbh5mzl' },
-  'Pedro Lorenzo': { defaultAvatar: '👦', id: 'pasvjed0i4' },
-  'Eloá': { defaultAvatar: '👧', id: 'pl5a687w9c' }
-};
-
 // --- NAVEGAÇÃO DE TELAS ---
 function showPlayerScreen(screenId) {
   document.querySelectorAll('.screen-view').forEach(sc => sc.classList.remove('active'));
@@ -43,41 +36,49 @@ function switchCustomizeTab(tabId) {
   if (panel) panel.classList.add('active');
 }
 
-// SELEÇÃO DE USUÁRIO
-function selectUser(username) {
-  selectedUsername = username;
-  selectedAvatar = USERS[username].defaultAvatar;
-  
-  // Atualizar tela de personalização
-  document.getElementById('customize-username').innerText = username;
-  
-  // Inicializar Avatar Builder na primeira vez
+// DIGITAR NOME → AVATAR
+function handleSetName(e) {
+  e.preventDefault();
+  const nameInput = document.getElementById('player-name-input');
+  const name = nameInput.value.trim();
+  if (!name) return;
+
+  selectedUsername = name;
+  document.getElementById('customize-username').innerText = name;
+
   if (!avatarInitialized && typeof AvatarBuilder !== 'undefined') {
     AvatarBuilder.initOptions();
     avatarInitialized = true;
   }
-  
-  // Renderizar avatar
+
   if (typeof AvatarBuilder !== 'undefined') {
     AvatarBuilder.render(document.getElementById('avatar-preview-svg'));
   }
-  
+
   showPlayerScreen('player-customize-screen');
 }
 
-function goBackToUserSelect() {
-  showPlayerScreen('player-user-select-screen');
+function goBackToNameInput() {
+  showPlayerScreen('player-name-screen');
 }
 
+// AVATAR → ENTRAR (pula PIN se já veio da URL)
 function goToPinInput() {
-  // Renderizar avatar nos previews
   if (typeof AvatarBuilder !== 'undefined') {
     AvatarBuilder.render(document.getElementById('login-avatar-svg'));
     AvatarBuilder.render(document.getElementById('lobby-avatar-svg'));
   }
-  
+
   document.getElementById('login-username-display').innerText = selectedUsername;
-  showPlayerScreen('player-login-screen');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const pinFromUrl = urlParams.get('pin');
+  if (pinFromUrl) {
+    currentPin = pinFromUrl;
+    joinWithPin(pinFromUrl);
+  } else {
+    showPlayerScreen('player-login-screen');
+  }
 }
 
 function goBackToCustomize() {
@@ -87,12 +88,15 @@ function goBackToCustomize() {
 function handlePlayerJoin(e) {
   e.preventDefault();
   const pin = document.getElementById('player-pin-input').value.trim();
-  const errorAlert = document.getElementById('error-alert');
+  if (!pin) return;
+  joinWithPin(pin);
+}
 
-  errorAlert.style.display = 'none';
+function joinWithPin(pin) {
+  const errorAlert = document.getElementById('error-alert');
+  if (errorAlert) errorAlert.style.display = 'none';
   currentPin = pin;
 
-  // Obter dados do avatar como SVG string
   let avatarData = selectedAvatar;
   if (typeof AvatarBuilder !== 'undefined') {
     avatarData = AvatarBuilder.renderAvatarString();
@@ -102,22 +106,23 @@ function handlePlayerJoin(e) {
     pin,
     nickname: selectedUsername,
     avatar: avatarData,
-    userId: USERS[selectedUsername].id
+    userId: null
   });
 }
 
 socket.on('join-error', ({ message }) => {
   const errorAlert = document.getElementById('error-alert');
-  errorAlert.innerText = message || 'Erro ao entrar na sala.';
-  errorAlert.style.display = 'block';
+  if (errorAlert) {
+    errorAlert.innerText = message || 'Erro ao entrar na sala.';
+    errorAlert.style.display = 'block';
+  }
+  showPlayerScreen('player-login-screen');
 });
 
 socket.on('joined-success', ({ pin, nickname, avatar, quizTitle }) => {
-  // Exibir avatar SVG no lobby
-  const lobbyAvatarContainer = document.getElementById('player-avatar-display');
-  if (lobbyAvatarContainer) {
-    lobbyAvatarContainer.innerHTML = avatar;
-    lobbyAvatarContainer.style.fontSize = '0';
+  const lobbyAvatar = document.getElementById('lobby-avatar-svg');
+  if (lobbyAvatar && avatar && (avatar.startsWith('<svg') || avatar.includes('<svg'))) {
+    lobbyAvatar.outerHTML = `<svg id="lobby-avatar-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">${avatar.replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '')}</svg>`;
   }
   
   document.getElementById('player-nickname-display').innerText = nickname;

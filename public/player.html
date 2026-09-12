@@ -7,16 +7,245 @@
   <link rel="stylesheet" href="/css/style.css">
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    /* ESTILOS EXCLUSIVOS DO AVATAR BUILDER */
+    .avatar-preview-container {
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 1rem auto;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 4px solid #00e5ff;
+      box-shadow: 0 0 30px rgba(0, 229, 255, 0.4);
+      position: relative;
+      background: #2a1a4e;
+    }
+    .avatar-preview-container svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .customize-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+    .customize-tabs::-webkit-scrollbar { display: none; }
+
+    .customize-tab {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .customize-tab:hover { background: rgba(255,255,255,0.1); }
+    .customize-tab.active {
+      background: rgba(0, 229, 255, 0.2);
+      border-color: #00e5ff;
+      color: #00e5ff;
+    }
+
+    .customize-panel { display: none; }
+    .customize-panel.active { display: block; }
+
+    .option-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      max-height: 140px;
+      overflow-y: auto;
+      padding: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.2) transparent;
+    }
+    .option-grid::-webkit-scrollbar { width: 4px; }
+    .option-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+    .option-btn {
+      aspect-ratio: 1;
+      border-radius: 10px;
+      border: 2px solid transparent;
+      background: rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      transition: all 0.15s;
+      padding: 4px;
+    }
+    .option-btn:hover { transform: scale(1.1); background: rgba(255,255,255,0.1); }
+    .option-btn.selected {
+      border-color: #00e5ff;
+      background: rgba(0, 229, 255, 0.2);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+    }
+    .option-btn svg { width: 100%; height: 100%; }
+
+    .color-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .color-swatch {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .color-swatch:hover { transform: scale(1.2); }
+    .color-swatch.selected {
+      border-color: white;
+      box-shadow: 0 0 12px currentColor;
+      transform: scale(1.15);
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin: 8px 0 4px 0;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body class="player-body">
 
-  <main class="player-card">
+  <main class="player-card" style="max-width: 420px;">
 
-    <!-- 1. TELA DE ENTRADA DO JOGADOR -->
-    <div id="player-login-screen" class="screen-view active">
+    <!-- 0. TELA DE DIGITAR NOME -->
+    <div id="player-name-screen" class="screen-view active">
       <div class="glass-card" style="text-align: center;">
-        <div class="brand-logo" style="justify-content: center; font-size: 2.2rem; margin-bottom: 1rem;">
+        <div class="brand-logo" style="justify-content: center; font-size: 2.2rem; margin-bottom: 0.5rem;">
           <span>⚡</span> KAHOOT <span style="color:#00e5ff">IA</span>
+        </div>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">Digite seu nome para jogar:</p>
+
+        <form onsubmit="handleSetName(event)">
+          <div class="form-group">
+            <input type="text" id="player-name-input" class="form-input" style="font-size: 1.3rem; text-align: center;" placeholder="Seu nome" maxlength="20" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 0.5rem;">
+            <span>✅</span> Continuar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 0.5 TELA DE PERSONALIZAÇÃO DE AVATAR (AVATAR BUILDER) -->
+    <div id="player-customize-screen" class="screen-view">
+      <div class="glass-card" style="text-align: center; padding: 1.5rem;">
+        <div class="brand-logo" style="justify-content: center; font-size: 1.5rem; margin-bottom: 0.2rem;">
+          <span>⚡</span> PERSONALIZAR
+        </div>
+        <p style="color: var(--text-muted); margin-bottom: 0.2rem; font-size: 0.85rem;">Jogando como:</p>
+        <h2 id="customize-username" style="font-family: var(--font-heading); font-size: 1.3rem; color: #00e5ff; margin-bottom: 0.8rem;">Nome</h2>
+
+        <!-- PREVIEW DO AVATAR -->
+        <div class="avatar-preview-container">
+          <svg id="avatar-preview-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+
+        <!-- ABAS DE CATEGORIAS -->
+        <div class="customize-tabs">
+          <button class="customize-tab active" onclick="switchCustomizeTab('tab-face')">😀 Rosto</button>
+          <button class="customize-tab" onclick="switchCustomizeTab('tab-hair')">💇 Cabelo</button>
+          <button class="customize-tab" onclick="switchCustomizeTab('tab-eyes')">👀 Olhos</button>
+          <button class="customize-tab" onclick="switchCustomizeTab('tab-glasses')">🕶️ Óculos</button>
+          <button class="customize-tab" onclick="switchCustomizeTab('tab-hats')">🎩 Chapéu</button>
+          <button class="customize-tab" onclick="switchCustomizeTab('tab-extras')">✨ Extras</button>
+          <button class="customize-tab" onclick="switchCustomizeTab('tab-bg')">🎨 Fundo</button>
+        </div>
+
+        <!-- PAINEL: ROSTO -->
+        <div id="tab-face" class="customize-panel active">
+          <div class="section-label">Cor da Pele</div>
+          <div class="color-row" id="skin-colors"></div>
+          <div class="section-label">Formato</div>
+          <div class="option-grid" id="face-options"></div>
+        </div>
+
+        <!-- PAINEL: CABELO -->
+        <div id="tab-hair" class="customize-panel">
+          <div class="section-label">Cor do Cabelo</div>
+          <div class="color-row" id="hair-colors"></div>
+          <div class="section-label">Estilo</div>
+          <div class="option-grid" id="hair-options"></div>
+        </div>
+
+        <!-- PAINEL: OLHOS -->
+        <div id="tab-eyes" class="customize-panel">
+          <div class="section-label">Estilo dos Olhos</div>
+          <div class="option-grid" id="eye-options"></div>
+        </div>
+
+        <!-- PAINEL: ÓCULOS -->
+        <div id="tab-glasses" class="customize-panel">
+          <div class="section-label">Óculos / Acessórios para Olhos</div>
+          <div class="option-grid" id="glasses-options"></div>
+        </div>
+
+        <!-- PAINEL: CHAPÉU -->
+        <div id="tab-hats" class="customize-panel">
+          <div class="section-label">Chapéus e Capacetes</div>
+          <div class="option-grid" id="hat-options"></div>
+        </div>
+
+        <!-- PAINEL: EXTRAS -->
+        <div id="tab-extras" class="customize-panel">
+          <div class="section-label">Barba / Bigode</div>
+          <div class="option-grid" id="facial-options"></div>
+          <div class="section-label">Acessórios</div>
+          <div class="option-grid" id="accessory-options"></div>
+        </div>
+
+        <!-- PAINEL: FUNDO -->
+        <div id="tab-bg" class="customize-panel">
+          <div class="section-label">Cor de Fundo</div>
+          <div class="color-row" id="bg-colors"></div>
+        </div>
+
+        <!-- BOTÕES -->
+        <div style="display: flex; gap: 8px; margin-top: 1rem;">
+          <button class="btn btn-secondary" onclick="goBackToNameInput()" style="flex: 1; padding: 0.7rem;">
+            <span>◀</span> Voltar
+          </button>
+          <button class="btn btn-primary btn-lg" onclick="goToPinInput()" style="flex: 2; padding: 0.7rem;">
+            <span>✅</span> Continuar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. TELA DE ENTRADA DO JOGADOR (APENAS PIN) -->
+    <div id="player-login-screen" class="screen-view">
+      <div class="glass-card" style="text-align: center;">
+        <div class="brand-logo" style="justify-content: center; font-size: 2.2rem; margin-bottom: 0.5rem;">
+          <span>⚡</span> KAHOOT <span style="color:#00e5ff">IA</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 1.5rem; background: rgba(0,229,255,0.1); padding: 0.8rem; border-radius: 12px; border: 1px solid rgba(0,229,255,0.3);">
+          <div class="avatar-preview-container" style="width: 60px; height: 60px; border-width: 2px; margin: 0; box-shadow: none;">
+            <svg id="login-avatar-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div style="text-align: left;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Jogando como:</div>
+            <div id="login-username-display" style="font-family: var(--font-heading); font-weight: 700; font-size: 1.2rem; color: #00e5ff;">Nome</div>
+          </div>
         </div>
 
         <div id="error-alert" style="display: none; background: rgba(226, 27, 60, 0.3); border: 1px solid var(--kahoot-red); padding: 0.8rem; border-radius: 10px; margin-bottom: 1rem; color: #ffb4c0; font-size: 0.95rem;">
@@ -25,39 +254,26 @@
 
         <form id="player-join-form" onsubmit="handlePlayerJoin(event)">
           <div class="form-group">
-            <label class="form-label" style="text-align: left;">PIN do Jogo:</label>
-            <input type="number" id="player-pin-input" class="form-input" style="font-size: 1.8rem; text-align: center; letter-spacing: 4px;" placeholder="000000" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" style="text-align: left;">Seu Apelido (Nickname):</label>
-            <input type="text" id="player-name-input" class="form-input" placeholder="Digite seu nome..." maxlength="15" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" style="text-align: left;">Escolha seu Avatar:</label>
-            <div class="avatar-picker">
-              <span class="avatar-option selected" onclick="selectAvatar('🚀')">🚀</span>
-              <span class="avatar-option" onclick="selectAvatar('🐯')">🐯</span>
-              <span class="avatar-option" onclick="selectAvatar('⚡')">⚡</span>
-              <span class="avatar-option" onclick="selectAvatar('🦊')">🦊</span>
-              <span class="avatar-option" onclick="selectAvatar('🐉')">🐉</span>
-              <span class="avatar-option" onclick="selectAvatar('👽')">👽</span>
-            </div>
+            <label class="form-label" style="text-align: center;">PIN do Jogo:</label>
+            <input type="number" id="player-pin-input" class="form-input" style="font-size: 2rem; text-align: center; letter-spacing: 6px;" placeholder="000000" required>
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 1rem;">
             <span>🎮</span> Entrar no Jogo!
           </button>
         </form>
+
+        <button class="btn btn-secondary" onclick="goBackToCustomize()" style="width: 100%; margin-top: 0.8rem;">
+          <span>◀</span> Trocar Personagem
+        </button>
       </div>
     </div>
 
     <!-- 2. LOBBY DE ESPERA DO JOGADOR -->
     <div id="player-lobby-screen" class="screen-view">
       <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem;">
-        <div id="player-avatar-display" style="font-size: 5rem; margin-bottom: 0.5rem; animation: bounce 1.2s infinite alternate;">
-          🚀
+        <div class="avatar-preview-container" style="width: 120px; height: 120px; margin-bottom: 1rem; animation: bounce 1.2s infinite alternate;">
+          <svg id="lobby-avatar-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
         <h2 id="player-nickname-display" style="font-family: var(--font-heading); font-size: 2.2rem; margin-bottom: 0.5rem;">
           Jogador
@@ -72,42 +288,26 @@
       </div>
     </div>
 
-    <!-- 3. TELA DE RESPOSTA DO JOGADOR (4 BOTÕES ESTILO KAHOOT) -->
+    <!-- 3. TELA DE RESPOSTA DO JOGADOR -->
     <div id="player-question-screen" class="screen-view">
       <div style="text-align: center; margin-bottom: 0.5rem;">
-        <span id="player-q-progress" class="brand-badge" style="background: rgba(255,255,255,0.2);">
-          Pergunta 1
-        </span>
+        <span id="player-q-progress" class="brand-badge" style="background: rgba(255,255,255,0.2);">Pergunta 1</span>
       </div>
 
       <div class="player-buttons-grid">
-        <button class="btn-kahoot-answer red" onclick="submitPlayerAnswer(0)">
-          <span>🔺</span>
-        </button>
-        <button class="btn-kahoot-answer blue" onclick="submitPlayerAnswer(1)">
-          <span>🔷</span>
-        </button>
-        <button class="btn-kahoot-answer yellow" onclick="submitPlayerAnswer(2)">
-          <span>🟡</span>
-        </button>
-        <button class="btn-kahoot-answer green" onclick="submitPlayerAnswer(3)">
-          <span>🟩</span>
-        </button>
+        <button class="btn-kahoot-answer red" onclick="submitPlayerAnswer(0)"><span>🔺</span></button>
+        <button class="btn-kahoot-answer blue" onclick="submitPlayerAnswer(1)"><span>🔷</span></button>
+        <button class="btn-kahoot-answer yellow" onclick="submitPlayerAnswer(2)"><span>🟡</span></button>
+        <button class="btn-kahoot-answer green" onclick="submitPlayerAnswer(3)"><span>🟩</span></button>
       </div>
     </div>
 
     <!-- 4. AGUARDANDO DEMAIS PARTICIPANTES -->
     <div id="player-waiting-screen" class="screen-view">
       <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem;">
-        <div style="font-size: 4rem; margin-bottom: 1rem; animation: pulse 0.8s infinite alternate;">
-          ✨
-        </div>
-        <h2 style="font-family: var(--font-heading); font-size: 2rem; margin-bottom: 1rem;">
-          Resposta Registrada!
-        </h2>
-        <p style="color: var(--text-muted); font-size: 1.1rem;">
-          Aguarde o encerramento do tempo para ver o resultado...
-        </p>
+        <div style="font-size: 4rem; margin-bottom: 1rem; animation: pulse 0.8s infinite alternate;">✨</div>
+        <h2 style="font-family: var(--font-heading); font-size: 2rem; margin-bottom: 1rem;">Resposta Registrada!</h2>
+        <p style="color: var(--text-muted); font-size: 1.1rem;">Aguarde o encerramento do tempo para ver o resultado...</p>
       </div>
     </div>
 
@@ -134,9 +334,7 @@
     <div id="player-gameover-screen" class="screen-view">
       <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem;">
         <div id="player-final-medal" style="font-size: 5rem; margin-bottom: 1rem;">🏆</div>
-        <h2 style="font-family: var(--font-heading); font-size: 2.4rem; margin-bottom: 0.5rem; color: #ffea00;">
-          Jogo Concluído!
-        </h2>
+        <h2 style="font-family: var(--font-heading); font-size: 2.4rem; margin-bottom: 0.5rem; color: #ffea00;">Jogo Concluído!</h2>
         <p style="color: var(--text-muted); font-size: 1.2rem; margin-bottom: 1.5rem;">
           Sua Posição Final: <strong id="player-final-rank" style="color: white; font-size: 1.5rem;">#1</strong>
         </p>
@@ -155,6 +353,7 @@
   </main>
 
   <script src="/js/audio.js"></script>
+  <script src="/js/avatar-builder.js"></script>
   <script src="/js/player.js"></script>
 </body>
 </html>
