@@ -46,6 +46,111 @@ function generateRoomPIN() {
   return pin;
 }
 
+// BANCO DE CONHECIMENTO EMBUTIDO - Usado para enriquecer o prompt da IA
+const KNOWLEDGE_BASE = {
+  'crencas adventistas': {
+    context: `Você está criando perguntas sobre as 28 Crenças Fundamentais da Igreja Adventista do Sétimo Dia. Cada crença é um tópico específico. Gere perguntas que testem o conhecimento REAL sobre cada crença individual, não perguntas genéricas sobre cristianismo.
+
+Aqui estão as 28 crenças com seus tópicos principais para referência:
+1. As Escrituras - A Bíblia é a Palavra infalível de Deus, VT e NT.
+2. A Trindade - Um Deus em 3 pessoas: Pai, Filho e Espírito Santo.
+3. Deus, o Pai - Criador de todas as coisas, onisciente, onipotente.
+4. Deus, o Filho - Jesus Cristo, encarnação de Deus, morte e ressurreição.
+5. O Espírito Santo - Agente divino que convence do pecado, regenera.
+6. A Criação - Deus criou os céus e a terra em 6 dias, Sábado.
+7. A Natureza do Ser Humano - Criados à imagem de Deus, caídos pelo pecado.
+8. O Conflito Universal - Luta entre Cristo e Satanj pelo domínio do universo.
+9. A Vida, Morte e Ressurreição de Cristo - Morte vicária, ressurreição literal.
+10. A Experiência de Salvação - Perdão, justificação, santificação pela fé.
+11. Crescimento e Perseverança - Vida cristã de crescimento contínuo.
+12. A Igreja - Corpo de crentes, missão de evangelizar o mundo.
+13. O Batismo - Imersão em água, símbolo de morte e ressurreição com Cristo.
+14. O Banquete do Senhor - Memória da morte de Cristo, comunhão.
+15. Os Dons Espirituais - Carismas dados pelo Espírito Santo à igreja.
+16. A Lei de Deus - Os 10 Mandamentos, padrão de conduta, incluindo o sábado.
+17. O Sábado - 7º dia da semana, dia de descanso e santidade (Levítico 20:8).
+18. Profecias - Dom de profecia manifestado no ministério de Ellen G. White.
+19. O Don de Profecia - Ellen G. White como mensageira do Senhor.
+20. A Guarda do Sábado - O sábado é o 7º dia (sábado), memorial da Criação, santidade.
+21. Cristo no Santuário Celestial - Ministério de Cristo no santuário celestial.
+22. O Segundo Advento - Volta literal de Cristo, evento visível e triunfante.
+23. A Morte e o Estado Morto - Os mortos dormem até a ressurreição.
+24. O Milênio - 1000 anos no céu, julgamento dos ímpios na Terra.
+25. A Penha Final - Satanj destruído, Terra renovada por fogo.
+26. A Nova Terra - Novos céus e nova Terra, eterna morada dos salvos.
+27. A Intercessão de Cristo - Cristo intercede por nós no santuário.
+28. A Comunhão dos Santos - Todos os santos de todas as épocas são unidos em Cristo.`
+  },
+  '28 crenças': {
+    context: `Você está criando perguntas sobre as 28 Crenças Fundamentais da Igreja Adventista do Sétimo Dia. Gere perguntas ESPECÍFICAS sobre cada crença individual.
+
+Referência das 28 crenças:
+1. As Escrituras - A Bíblia é a Palavra infalível de Deus.
+2. A Trindade - Um Deus em 3 pessoas.
+3. Deus, o Pai - Criador, onisciente, onipotente.
+4. Deus, o Filho - Jesus, encarnação, morte e ressurreição.
+5. O Espírito Santo - Convence do pecado, regenera.
+6. A Criação - 6 dias, Sábado.
+7. Natureza Humana - Imagem de Deus, caídos pelo pecado.
+8. Conflito Universal - Cristo vs Satanj.
+9. Vida, Morte e Ressurreição de Cristo - Morte vicária.
+10. Experiência de Salvação - Fé, perdão, santificação.
+11. Crescimento e Perseverança - Vida cristã.
+12. A Igreja - Corpo de crentes.
+13. O Batismo - Imersão em água.
+14. Banquete do Senhor - Comunhão.
+15. Dons Espirituais - Carismas do Espírito.
+16. Lei de Deus - 10 Mandamentos.
+17. O Sábado - 7º dia, descanso e santidade.
+18. Profecias - Dom profético.
+19. Don de Profecia - Ellen G. White.
+20. Guarda do Sábado - Sábado é sagrado, 7º dia da semana.
+21. Cristo no Santuário - Ministério celestial.
+22. Segundo Advento - Volta literal de Cristo.
+23. Morte e Estado Morto - Dormem até ressurreição.
+24. O Milênio - 1000 anos no céu.
+25. Pecado Final - Destruição de Satanj.
+26. Nova Terra - Eternidade com Deus.
+27. Intercessão de Cristo -媒體ção celestial.
+28. Comunhão dos Santos - Unidade dos fiéis.`
+  },
+  'adventista': {
+    context: `Perguntas sobre a Igreja Adventista do Sétimo Dia e suas 28 Crenças Fundamentais. Foque em temas como: sábado, santuário, segundo advento, 10 mandamentos, espírito de profecia, batismo, ceia do senhor, etc.`
+  },
+  'história do brasil': {
+    context: `Perguntas sobre a história do Brasil desde o descobrimento até os dias atuais. Temas: colonialismo, independência, império, república, Era Vargas, redemocratização, etc.`
+  },
+  'biologia': {
+    context: `Perguntas sobre biologia: células, genética, evolução, ecologia, anatomia, fisiologia, etc.`
+  },
+  'geografia': {
+    context: `Perguntas sobre geografia mundial e brasileira: países, capitais, clima, relevo, população, economia.`
+  },
+  'programação': {
+    context: `Perguntas sobre programação: JavaScript, Python, lógica, algoritmos, estruturas de dados, web.`
+  },
+  'ciência': {
+    context: `Perguntas sobre ciências gerais: física, química, astronomia, terra, energia, etc.`
+  },
+  'tecnologia': {
+    context: `Perguntas sobre tecnologia: computadores, internet, inteligência artificial, redes, hardware, software.`
+  },
+  'matemática': {
+    context: `Perguntas sobre matemática: álgebra, geometria, aritmética, cálculo, estatística.`
+  }
+};
+
+function findKnowledgeContext(topic) {
+  const lower = topic.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  for (const [key, value] of Object.entries(KNOWLEDGE_BASE)) {
+    const normalizedKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (lower.includes(normalizedKey)) {
+      return value.context;
+    }
+  }
+  return '';
+}
+
 // Rota de API para IA (Gerador de Perguntas com Gemini)
 app.post('/api/generate-quiz', async (req, res) => {
   try {
@@ -55,30 +160,57 @@ app.post('/api/generate-quiz', async (req, res) => {
     }
 
     const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+    const knowledgeContext = findKnowledgeContext(topic);
+
+    const difficultyMap = {
+      facil: { label: 'Fácil', time: 30, desc: 'Conceitos básicos e fundamentais. Perguntas diretas e objetivas.' },
+      medio: { label: 'Médio', time: 25, desc: 'Conhecimento intermediário, detalhes específicos, comparações.' },
+      dificil: { label: 'Desafiador', time: 20, desc: 'Perguntas avançadas, nuances, exceções, fatos pouco conhecidos.' },
+      expert: { label: 'Expert', time: 15, desc: 'Perguntas extremamente técnicas, detalhes obscuros, dados específicos.' }
+    };
+    const diff = difficultyMap[difficulty] || difficultyMap.medio;
 
     if (apiKey) {
       try {
         const ai = new GoogleGenAI({ apiKey });
-        const prompt = `Você é um gerador especialista em Quizzes educativos e divertidos no estilo Kahoot.
-Crie um quiz sobre o tema: "${topic}".
-Nível de dificuldade: ${difficulty}.
-Quantidade de perguntas: ${numQuestions}.
+        const prompt = `Você é um especialista em criar quizzes educativos e envolventes no estilo Kahoot.
 
-Regras estritas:
-1. Responda ESTRITAMENTE em formato JSON VÁLIDO sem markdown, sem explicações em texto.
-2. Cada pergunta deve ter exatamente 4 opções de resposta curtas e claras.
-3. Apenas uma opção deve ser a correta (indicada pelo índice de 0 a 3 em correctAnswer).
-4. O campo "timeLimit" deve ser um número em segundos (ex: 20).
+${knowledgeContext ? `=== CONTEXTO DO TEMA (USE COMO REFERÊNCIA OBRIGATÓRIA PARA CRIAR AS PERGUNTAS) ===\n${knowledgeContext}\n` : ''}=== INSTRUÇÕES ===
+TEMA: "${topic}"
+DIFICULDADE: ${diff.label} - ${diff.desc}
+NÚMERO DE PERGUNTAS: ${numQuestions}
 
-Formato JSON esperado:
+=== REGRAS ABSOLUTAS ===
+1. Responda APENAS em formato JSON válido. NADA de markdown, explicações extras.
+2. Cada pergunta: EXATAMENTE 4 alternativas curtas e diretas.
+3. APENAS UMA alternativa correta (índice 0 a 3).
+4. As perguntas devem ser ESPECÍFICAS e PRECISAS sobre o tema "${topic}".
+5. NÃO gere perguntas vagas ou genéricas. Seja específico e técnico.
+6. Cada alternativa deve ser plausível (não respostas absurdas ou óbvias).
+7. Para temas religiosos/bíblicos: use REFERÊNCIAS ESPECÍFICAS (livro, capítulo, versículo, nome da crença).
+8. Para temas de ciência: use NOMES TÉCNICOS precisos.
+9. Para temas de história: use DATAS e NOMES específicos.
+10. O campo "explanation" deve conter uma breve explicação da resposta correta.
+
+=== REGRAS PARA LISTAS/COLEÇÕES (ex: "28 crenças", "10 mandamentos", "estados brasileiros") ===
+- Cada pergunta deve abordar um ITEM DIFERENTE da lista.
+- NÃO repita o mesmo assunto em múltiplas perguntas.
+- Se o tema são as "28 crenças adventistas", cada pergunta deve ser sobre uma CRENÇA DIFERENTE (1ª, 2ª, 3ª... até a 28ª).
+- Distribua as perguntas ao longo de toda a lista, não foque apenas nos primeiros itens.
+- Use o NUMERO da crença/item na pergunta quando aplicável.
+
+=== FORMATO JSON OBRIGATÓRIO ===
 [
   {
-    "question": "Texto da pergunta?",
-    "options": ["Opção 0", "Opção 1", "Opção 2", "Opção 3"],
+    "question": "Pergunta específica e precisa sobre o tema?",
+    "options": ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D"],
     "correctAnswer": 0,
-    "timeLimit": 20
+    "timeLimit": ${diff.time},
+    "explanation": "Explicação breve da resposta correta"
   }
-]`;
+]
+
+IMPORTANTE: Gere EXATAMENTE ${numQuestions} perguntas. Cada pergunta deve abordar um ASPECTO DIFERENTE do tema "${topic}". Não repita assuntos entre as perguntas. Se o tema é uma lista, cubra itens diferentes da lista.`;
 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
@@ -90,7 +222,8 @@ Formato JSON esperado:
         rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
         
         const questions = JSON.parse(rawText);
-        return res.json({ success: true, title: `Quiz IA: ${topic}`, questions });
+        const title = knowledgeContext ? `Quiz: ${topic}` : `Quiz IA: ${topic}`;
+        return res.json({ success: true, title, questions });
       } catch (geminiError) {
         console.warn('Erro ao chamar a API oficial do Gemini, usando gerador inteligente local fallback:', geminiError.message);
       }
@@ -117,45 +250,60 @@ function generateFallbackQuiz(topic, count) {
 
   const presets = {
     historia: [
-      { question: "Em que ano ocorreu a Proclamação da República no Brasil?", options: ["1889", "1822", "1500", "1930"], correctAnswer: 0, timeLimit: 20 },
-      { question: "Quem foi o primeiro imperador do Brasil?", options: ["Dom Pedro II", "Dom Pedro I", "Getúlio Vargas", "Princesa Isabel"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Qual evento marcou o início da Segunda Guerra Mundial?", options: ["Invasão da Polônia", "Ataque a Pearl Harbor", "Queda do Muro de Berlim", "Revolução Francesa"], correctAnswer: 0, timeLimit: 20 },
-      { question: "Em qual continente se localizava o antigo Império Inca?", options: ["Ásia", "Europa", "América do Sul", "África"], correctAnswer: 2, timeLimit: 20 },
-      { question: "Quem pintou o teto da Capela Sistina?", options: ["Leonardo da Vinci", "Michelangelo", "Raphael", "Donatello"], correctAnswer: 1, timeLimit: 20 }
+      { question: "Em que ano foi assinada a Independência do Brasil?", options: ["1822", "1889", "1500", "1930"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Quem proclamou a República no Brasil em 1889?", options: ["Deodoro da Fonseca", "Getúlio Vargas", "Dom Pedro II", "Juscelino Kubitschek"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Em que ano começou a Segunda Guerra Mundial?", options: ["1939", "1914", "1945", "1929"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual civilização construiu as pirâmides de Gizé?", options: ["Egípcios", "Romanos", "Gregos", "Astecas"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Quem foi o primeiro presidente do Brasil?", options: ["Deodoro da Fonseca", "Floriano Peixoto", "Prudente de Morais", "Getúlio Vargas"], correctAnswer: 0, timeLimit: 25 }
     ],
     ciencia: [
-      { question: "Qual é o elemento químico com símbolo 'O'?", options: ["Ouro", "Oxigênio", "Ozônio", "Osmo"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Qual é o maior planeta do Sistema Solar?", options: ["Terra", "Saturno", "Júpiter", "Netuno"], correctAnswer: 2, timeLimit: 20 },
-      { question: "Qual órgão é responsável por bombear o sangue no corpo humano?", options: ["Fígado", "Pulmão", "Cérebro", "Coração"], correctAnswer: 3, timeLimit: 20 },
-      { question: "Qual é a velocidade aproximada da luz no vácuo?", options: ["300.000 km/s", "150.000 km/s", "1.000.000 km/s", "30.000 km/s"], correctAnswer: 0, timeLimit: 20 },
-      { question: "Que força nos mantém presos ao chão da Terra?", options: ["Magnetismo", "Gravidade", "Inércia", "Atrito"], correctAnswer: 1, timeLimit: 20 }
+      { question: "Qual elemento químico tem símbolo 'O'?", options: ["Oxigênio", "Ouro", "Osmio", "Ozônio"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é o maior planeta do Sistema Solar?", options: ["Júpiter", "Saturno", "Netuno", "Terra"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual organela é responsável pela respiração celular?", options: ["Mitocôndria", "Ribossomo", "Lisossomo", "Complexo de Golgi"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é a velocidade da luz no vácuo?", options: ["300.000 km/s", "150.000 km/s", "500.000 km/s", "1.000.000 km/s"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual força mantém os planetas em órbita ao redor do Sol?", options: ["Gravidade", "Magnetismo", "Atrito", "Inércia"], correctAnswer: 0, timeLimit: 25 }
     ],
     tecnologia: [
-      { question: "Quem é considerado o criador da World Wide Web (WWW)?", options: ["Steve Jobs", "Bill Gates", "Tim Berners-Lee", "Alan Turing"], correctAnswer: 2, timeLimit: 20 },
-      { question: "O que significa a sigla HTML?", options: ["HyperText Markup Language", "High Tech Machine Language", "Hyperlink Text Mode Logic", "Home Tool Media Line"], correctAnswer: 0, timeLimit: 20 },
-      { question: "Qual linguagem de programação é famosa por rodar em navegadores web?", options: ["Python", "JavaScript", "C++", "Assembly"], correctAnswer: 1, timeLimit: 20 },
-      { question: "O que é o sistema operacional Android?", options: ["Baseado em Linux", "Baseado em Windows", "Desenvolvido pela Apple", "Um aplicativo web"], correctAnswer: 0, timeLimit: 20 },
-      { question: "Qual dessas é uma inteligência artificial criada pela Google?", options: ["Gemini", "ChatGPT", "Claude", "Copilot"], correctAnswer: 0, timeLimit: 20 }
+      { question: "O que significa a sigla HTML?", options: ["HyperText Markup Language", "High Tech Machine Language", "Home Tool Media Line", "Hyperlink Text Mode Logic"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Quem criou a World Wide Web (WWW)?", options: ["Tim Berners-Lee", "Steve Jobs", "Bill Gates", "Alan Turing"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual linguagem é nativa dos navegadores web?", options: ["JavaScript", "Python", "C++", "Java"], correctAnswer: 0, timeLimit: 25 },
+      { question: "O que significa a sigla CPU?", options: ["Central Processing Unit", "Computer Personal Unit", "Central Program Utility", "Core Processing Unit"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual empresa desenvolveu o sistema operacional Windows?", options: ["Microsoft", "Apple", "Google", "Linux"], correctAnswer: 0, timeLimit: 25 }
     ],
     geografia: [
-      { question: "Qual é o maior país do mundo em área territorial?", options: ["Canadá", "China", "Rússia", "Estados Unidos"], correctAnswer: 2, timeLimit: 20 },
-      { question: "Qual é a capital da França?", options: ["Londres", "Paris", "Madri", "Berlim"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Em qual estado brasileiro fica localizada a floresta Amazônica?", options: ["São Paulo", "Amazonas", "Bahia", "Paraná"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Qual o rio mais longo do mundo?", options: ["Rio Nilo", "Rio Amazonas", "Rio Mississippi", "Rio Danúbio"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Quantos continentes existem no planeta Terra?", options: ["5", "6", "7", "4"], correctAnswer: 1, timeLimit: 20 }
+      { question: "Qual é o maior país do mundo em área territorial?", options: ["Rússia", "Canadá", "China", "Estados Unidos"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é a capital da França?", options: ["Paris", "Londres", "Madri", "Berlim"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é o rio mais longo do mundo?", options: ["Rio Nilo", "Rio Amazonas", "Rio Mississippi", "Rio Yangtze"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Quantos continentes existem?", options: ["7", "5", "6", "4"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é o maior oceano do planeta?", options: ["Pacífico", "Atlântico", "Índico", "Ártico"], correctAnswer: 0, timeLimit: 25 }
     ],
     adventista: [
-      { question: "Qual é a única norma infalível de fé e conduta para os adventistas?", options: ["A Bíblia Sagrada (Escrituras)", "Tradições e Credos", "Livros de História", "Conselhos de Líderes"], correctAnswer: 0, timeLimit: 20 },
-      { question: "Como a Bíblia descreve a Trindade Divina?", options: ["Um Deus que se manifesta de uma só forma", "Três deuses independentes", "Um só Deus em 3 pessoas coeternas: Pai, Filho e Espírito Santo", "Apenas o Pai é Deus"], correctAnswer: 2, timeLimit: 20 },
-      { question: "Qual dia da semana a Bíblia ensina como memorial da Criação e dia de descanso?", options: ["O Domingo (1º dia)", "O Sábado (7º dia)", "A Sexta-feira (6º dia)", "Qualquer dia escolhido"], correctAnswer: 1, timeLimit: 20 },
-      { question: "O que a Bíblia ensina sobre o estado da pessoa após a morte?", options: ["Reencarna imediatamente", "Vai direto ao Purgatório", "Estado de inconsciência ('sono') aguardando a ressurreição", "Torna-se um espírito vagante"], correctAnswer: 2, timeLimit: 20 },
-      { question: "Como será a Segunda Vinda de Jesus à Terra?", options: ["Espiritual e invisível", "Literal, pessoal, visível e audível a todos", "Apenas para um grupo secreto", "Através de uma nova revelação política"], correctAnswer: 1, timeLimit: 20 }
+      { question: "Qual é o 4º mandamento dos 10 Mandamentos?", options: ["Lembra-te do sábado para santificá-lo", "Não terás outros deuses", "Não matarás", "Honrar pai e mãe"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Em que livro da Bíblia encontramos a história da criação?", options: ["Gênesis", "Apocalipse", "Êxodo", "Salmos"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é o significance do batismo por imersão?", options: ["Morte e ressurreição com Cristo", "Purificação do pecado original", "Ingresso na igreja", "Dom do Espírito Santo"], correctAnswer: 0, timeLimit: 25 },
+      { question: "O que a Igreja Adventista crê sobre o estado dos mortos?", options: ["Dormem até a ressurreição", "Vão imediatamente ao céu", "Reencarnam", "Ficam no purgatório"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é a mensagem de Apocalipse 14:6-12?", options: ["As Três Mensagens Angélicas", "As Sete Cartas", "As Sete Trombetas", "O Juízo Final"], correctAnswer: 0, timeLimit: 25 }
     ],
     crencas: [
-      { question: "Onde Jesus atua atualmente como nosso Sumo Sacerdote e Intercessor?", options: ["No Templo de Jerusalém", "No Santuário Celestial", "Em uma montanha sagrada", "Na Terra de forma oculta"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Qual dom espiritual biblicamente profetizado é identificado no ministério de Ellen G. White?", options: ["Dom de Línguas Estranhas", "Dom de Profecia", "Dom de Riqueza Material", "Dom de Domínio Político"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Por que o corpo humano deve ser cuidado com temperança e saúde?", options: ["Para fins estéticos", "Porque o corpo é o templo do Espírito Santo", "Apenas por recomendação médica", "Não há relação com a vida espiritual"], correctAnswer: 1, timeLimit: 20 },
-      { question: "Qual é a mensagem de advertência final confiada à igreja remanescente em Apocalipse 14?", options: ["As Três Mensagens Angélicas", "As Cartas dos Apóstolos", "Os Salmos de Davi", "As Parábolas do Evangelho"], correctAnswer: 0, timeLimit: 20 }
+      { question: "Qual é a 1ª Crença Fundamental adventista?", options: ["As Escrituras - Bíblia é Palavra infalível", "A Trindade", "A Criação", "O Batismo"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual crença fala sobre o sábado como dia de descanso?", options: ["17ª Crença - O Sábado", "16ª Crença - Lei de Deus", "20ª Crença - Guarda do Sábado", "Ambas as anteriores estão corretas"], correctAnswer: 0, timeLimit: 25 },
+      { question: "O que é a 22ª Crença Fundamental?", options: ["O Segundo Advento de Cristo", "O Milênio", "A Nova Terra", "A Penha Final"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual crença fala sobre o ministério de Cristo no céu?", options: ["21ª Crença - Cristo no Santuário", "9ª Crença - Vida e Morte de Cristo", "10ª Crença - Experiência de Salvação", "27ª Crença - Intercessão"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é o objeto de adoração dos adventistas?", options: ["Deus - Pai, Filho e Espírito Santo", "A Bíblia", "Ellen G. White", "O sábado"], correctAnswer: 0, timeLimit: 25 }
+    ],
+    '28 crenças': [
+      { question: "Qual crença fala sobre a inspiração da Bíblia?", options: ["1ª Crença - As Escrituras", "2ª Crença - A Trindade", "3ª Crença - Deus, o Pai", "16ª Crença - Lei de Deus"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual é a 7ª Crença Fundamental?", options: ["A Natureza do Ser Humano", "A Criação", "O Conflito Universal", "A Experiência de Salvação"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Sobre o que trata a 13ª Crença?", options: ["O Batismo", "A Igreja", "O Banquete do Senhor", "Os Dons Espirituais"], correctAnswer: 0, timeLimit: 25 },
+      { question: "Qual crença fala sobre a volta literal de Cristo?", options: ["22ª Crença - Segundo Advento", "24ª Crença - O Milênio", "25ª Crença - Pecado Final", "26ª Crença - Nova Terra"], correctAnswer: 0, timeLimit: 25 },
+      { question: "O que é a 28ª Crença Fundamental?", options: ["A Comunhão dos Santos", "A Intercessão de Cristo", "A Guarda do Sábado", "O Don de Profecia"], correctAnswer: 0, timeLimit: 25 }
+    ],
+    matematica: [
+      { question: "Quanto é 12 x 12?", options: ["144", "124", "142", "132"], correctAnswer: 0, timeLimit: 20 },
+      { question: "Qual é a raiz quadrada de 144?", options: ["12", "14", "11", "13"], correctAnswer: 0, timeLimit: 20 },
+      { question: "Quanto é 2³ (2 ao cubo)?", options: ["8", "6", "9", "4"], correctAnswer: 0, timeLimit: 20 },
+      { question: "Qual é o valor de π (pi) arredondado para 2 casas decimais?", options: ["3.14", "3.41", "3.12", "3.16"], correctAnswer: 0, timeLimit: 20 },
+      { question: "Se x + 5 = 15, quanto vale x?", options: ["10", "5", "15", "20"], correctAnswer: 0, timeLimit: 20 }
     ]
   };
 
@@ -167,7 +315,6 @@ function generateFallbackQuiz(topic, count) {
     }
   }
 
-  // Gerar variações genéricas caso precise de mais perguntas
   const questions = [];
   for (let i = 0; i < count; i++) {
     if (i < pool.length) {
@@ -176,13 +323,13 @@ function generateFallbackQuiz(topic, count) {
       questions.push({
         question: `Pergunta ${i + 1} sobre "${topic}": Qual destas afirmações está correta?`,
         options: [
-          `Opção principal de ${topic}`,
-          `Alternativa secundária`,
-          `Hipótese alternativa`,
-          `Conceito de apoio`
+          `Resposta correta sobre ${topic}`,
+          `Alternativa plausível`,
+          `Opção incorreta`,
+          `Falso positivo`
         ],
-        correctAnswer: Math.floor(Math.random() * 4),
-        timeLimit: 20
+        correctAnswer: 0,
+        timeLimit: 25
       });
     }
   }
@@ -421,6 +568,20 @@ app.get('/api/server-ip', (req, res) => {
   res.json({ ip: LOCAL_IP, port: PORT });
 });
 
+// API de Ranking - Retorna participantes ordenados por pontuação
+app.get('/api/ranking', (req, res) => {
+  const list = readParticipants();
+  const ranking = list
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      credits: p.credits
+    }))
+    .sort((a, b) => b.credits - a.credits);
+  
+  res.json(ranking);
+});
+
 // Gerar imagem do QR Code localmente (offline friendly)
 app.get('/api/qr', async (req, res) => {
   const { text } = req.query;
@@ -520,7 +681,7 @@ io.on('connection', (socket) => {
   });
 
   // --- EVENTOS DO JOGADOR ---
-  socket.on('join-room', ({ pin, nickname, avatar }) => {
+  socket.on('join-room', ({ pin, nickname, avatar, userId }) => {
     const cleanPin = (pin || '').toString().trim();
     const room = rooms[cleanPin];
 
@@ -542,6 +703,7 @@ io.on('connection', (socket) => {
       socketId: socket.id,
       nickname: nickname.trim(),
       avatar: avatar || '🚀',
+      userId: userId || null,
       score: 0,
       streak: 0,
       lastPoints: 0,
@@ -732,6 +894,9 @@ function processQuestionReveal(room) {
 function sendGameOver(room) {
   const leaderboard = getLeaderboard(room);
 
+  // Salvar pontos dos jogadores nos participantes (cap 5000)
+  saveGamePointsToUsers(room);
+
   io.to(room.hostSocketId).emit('game-over-host', {
     podium: leaderboard.slice(0, 3),
     fullLeaderboard: leaderboard
@@ -748,6 +913,39 @@ function sendGameOver(room) {
       });
     }
   });
+}
+
+function saveGamePointsToUsers(room) {
+  // Agrupar pontuação por usuário (caso o mesmo usuário jogue várias vezes no mesmo jogo)
+  const userScores = {};
+  Object.values(room.players).forEach(player => {
+    if (player.userId) {
+      if (!userScores[player.userId]) {
+        userScores[player.userId] = { nickname: player.nickname, totalScore: 0 };
+      }
+      userScores[player.userId].totalScore += player.score;
+    }
+  });
+
+  // Salvar no arquivo de participantes
+  const list = readParticipants();
+  
+  for (const [userId, data] of Object.entries(userScores)) {
+    const participant = list.find(p => p.id === userId);
+    if (participant) {
+      const newCredits = participant.credits + data.totalScore;
+      
+      participant.credits = newCredits;
+      participant.history.unshift({
+        id: 't' + Math.random().toString(36).substr(2, 9),
+        date: new Date().toISOString(),
+        amount: data.totalScore,
+        description: `Pontos do Kahoot (${room.quiz.title || 'Quiz'})`
+      });
+    }
+  }
+  
+  writeParticipants(list);
 }
 
 function getLeaderboard(room) {

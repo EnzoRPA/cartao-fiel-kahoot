@@ -424,6 +424,13 @@ body {
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.player-tag svg,
+.podium-avatar svg,
+.leaderboard-item svg {
+  width: 100%;
+  height: 100%;
+}
+
 @keyframes popIn {
   from { transform: scale(0.5); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -631,6 +638,12 @@ body {
 .leaderboard-item:nth-child(2) { background: rgba(192, 192, 192, 0.2); border-color: silver; }
 .leaderboard-item:nth-child(3) { background: rgba(205, 127, 50, 0.2); border-color: #cd7f32; }
 
+.leaderboard-item svg {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
 /* PÓDIO FINAL */
 .podium-container {
   display: flex;
@@ -652,6 +665,16 @@ body {
   font-size: 3rem;
   margin-bottom: 10px;
   animation: bounce 1s infinite alternate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.podium-avatar svg {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
 }
 
 @keyframes bounce {
@@ -784,6 +807,128 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* SELEÇÃO DE USUÁRIO */
+.user-select-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 1rem;
+}
+
+.user-select-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 1.2rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  color: white;
+  font-family: var(--font-heading);
+}
+
+.user-select-card:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: #00e5ff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 229, 255, 0.2);
+}
+
+.user-select-card:active {
+  transform: scale(0.98);
+}
+
+.user-select-avatar {
+  font-size: 3rem;
+  width: 70px;
+  height: 70px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-select-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+/* PERSONALIZAÇÃO DE AVATAR */
+.avatar-grid-custom {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-top: 0.5rem;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.avatar-option-custom {
+  font-size: 2rem;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+}
+
+.avatar-option-custom:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.avatar-option-custom.selected {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.2);
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+}
+
+/* AVATAR SVG RENDERING - SMOOTH AND POLISHED */
+.avatar-preview-container svg,
+.player-tag svg,
+.podium-avatar svg,
+.leaderboard-item svg,
+.user-select-avatar svg,
+.scan-result-card svg,
+.printable-card-item svg {
+  image-rendering: optimizeQuality;
+  shape-rendering: geometricPrecision;
+}
+
+/* PODIUM AVATAR LARGER */
+.podium-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid rgba(255,255,255,0.3);
+  background: rgba(0,0,0,0.3);
+}
+
+/* LEADERBOARD AVATAR */
+.leaderboard-item svg {
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+
+/* PLAYER TAG AVATAR */
+.player-tag svg {
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.15);
+}
+
 /* RESPONSIVIDADE */
 @media (max-width: 768px) {
   .navbar { padding: 1rem; }
@@ -792,4 +937,5 @@ body {
   .pin-code { font-size: 3.2rem; }
   .question-title-box { font-size: 1.4rem; }
   .player-buttons-grid { height: 55vh; }
+  .avatar-grid-custom { grid-template-columns: repeat(5, 1fr); }
 }
