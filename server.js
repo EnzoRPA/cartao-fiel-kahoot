@@ -173,44 +173,43 @@ app.post('/api/generate-quiz', async (req, res) => {
     if (apiKey) {
       try {
         const ai = new GoogleGenAI({ apiKey });
-        const prompt = `Você é um especialista em criar quizzes educativos e envolventes no estilo Kahoot.
+        const prompt = `Você é um especialista em criar quizzes. Suas perguntas devem ser EXTREMAMENTE ESPECÍFICAS ao tema.
 
-${knowledgeContext ? `=== CONTEXTO DO TEMA (USE COMO REFERÊNCIA OBRIGATÓRIA PARA CRIAR AS PERGUNTAS) ===\n${knowledgeContext}\n` : ''}=== INSTRUÇÕES ===
-TEMA: "${topic}"
-DIFICULDADE: ${diff.label} - ${diff.desc}
-NÚMERO DE PERGUNTAS: ${numQuestions}
+${knowledgeContext ? `=== REFERÊNCIA OBRIGATÓRIA (use APENAS informações daqui) ===\n${knowledgeContext}\n` : ''}=== TEMA ===
+"${topic}"
 
-=== REGRAS ABSOLUTAS ===
-1. Responda APENAS em formato JSON válido. NADA de markdown, explicações extras.
-2. Cada pergunta: EXATAMENTE 4 alternativas curtas e diretas.
-3. APENAS UMA alternativa correta (índice 0 a 3).
-4. As perguntas devem ser ESPECÍFICAS e PRECISAS sobre o tema "${topic}".
-5. NÃO gere perguntas vagas ou genéricas. Seja específico e técnico.
-6. Cada alternativa deve ser plausível (não respostas absurdas ou óbvias).
-7. Para temas religiosos/bíblicos: use REFERÊNCIAS ESPECÍFICAS (livro, capítulo, versículo, nome da crença).
-8. Para temas de ciência: use NOMES TÉCNICOS precisos.
-9. Para temas de história: use DATAS e NOMES específicos.
-10. O campo "explanation" deve conter uma breve explicação da resposta correta.
+=== DIFFICULDADE: ${diff.label} (${diff.desc}) ===
 
-=== REGRAS PARA LISTAS/COLEÇÕES (ex: "28 crenças", "10 mandamentos", "estados brasileiros") ===
-- Cada pergunta deve abordar um ITEM DIFERENTE da lista.
-- NÃO repita o mesmo assunto em múltiplas perguntas.
-- Se o tema são as "28 crenças adventistas", cada pergunta deve ser sobre uma CRENÇA DIFERENTE (1ª, 2ª, 3ª... até a 28ª).
-- Distribua as perguntas ao longo de toda a lista, não foque apenas nos primeiros itens.
-- Use o NUMERO da crença/item na pergunta quando aplicável.
+=== REGRAS ESTRTITAS ===
+1. Formato: APENAS JSON válido. Sem markdown, sem explicações.
+2. EXATAMENTE 4 alternativas por pergunta.
+3. APENAS 1 alternativa correta (índice 0-3).
+4. Cada pergunta deve ser sobre um ASPECTO DIFERENTE do tema.
+5. NUNCA gere perguntas genéricas ou que sirvam para qualquer tema.
 
-=== FORMATO JSON OBRIGATÓRIO ===
+=== O QUE NÃO FAZER ===
+- NÃO pergunte "O que significa a sigla X?" (isso é genérico demais)
+- NÃO pergunte conceitos básicos que qualquer pessoa sabe
+- NÃO repita o mesmo assunto em perguntas diferentes
+- NÃO gere perguntas que NÃO estejam diretamente relacionadas ao tema "${topic}"
+
+=== COMO GERAR BOAS PERGUNTAS ===
+- Para "28 crenças adventistas": cada pergunta sobre UMA CRENÇA ESPECÍFICA (ex: "Qual é a 7ª Crença?"; "Segundo a 20ª Crença, como devemos guardar o sábado?")
+- Para "história do Brasil": use DATAS, NOMES e EVENTOS específicos
+- Para "ciência": use NOMES TÉCNICOS e PROCESSOS específicos
+- Para qualquer tema: pergunte sobre DETALHES, não sobre conceitos gerais
+
+=== FORMATO JSON ===
 [
   {
-    "question": "Pergunta específica e precisa sobre o tema?",
+    "question": "Pergunta MUITO específica sobre ${topic}?",
     "options": ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D"],
     "correctAnswer": 0,
-    "timeLimit": ${diff.time},
-    "explanation": "Explicação breve da resposta correta"
+    "timeLimit": ${diff.time}
   }
 ]
 
-IMPORTANTE: Gere EXATAMENTE ${numQuestions} perguntas. Cada pergunta deve abordar um ASPECTO DIFERENTE do tema "${topic}". Não repita assuntos entre as perguntas. Se o tema é uma lista, cubra itens diferentes da lista.`;
+Gere ${numQuestions} perguntas. Cada uma sobre um aspecto DIFERENTE de "${topic}".`;
 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
