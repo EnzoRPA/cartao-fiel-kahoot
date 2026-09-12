@@ -83,9 +83,14 @@
                 <span>👥</span> <span id="lobby-player-count">0</span> Participantes
               </div>
 
-              <button id="btn-start-game" class="btn btn-success btn-lg" onclick="hostStartGame()">
-                <span>🚀</span> Iniciar Jogo!
-              </button>
+              <div style="display: flex; gap: 0.5rem;">
+                <button id="btn-start-game" class="btn btn-success btn-lg" onclick="hostStartGame()">
+                  <span>🚀</span> Iniciar Jogo!
+                </button>
+                <button class="btn btn-danger btn-lg" onclick="hostCancelGame()">
+                  <span>✖</span> Cancelar
+                </button>
+              </div>
             </div>
 
             <div class="glass-card" style="flex: 1; min-height: 250px; background: rgba(0,0,0,0.2);">
@@ -144,7 +149,10 @@
           </div>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; margin-top: 1.5rem;">
+          <button class="btn btn-danger" onclick="hostCancelGame()">
+            <span>✖</span> Cancelar Jogo
+          </button>
           <button class="btn btn-primary" onclick="hostShowReveal()">
             <span>⏩</span> Encerrar Tempo & Revelar
           </button>
@@ -202,7 +210,10 @@
           </div>
         </div>
 
-        <div style="display: flex; justify-content: center; margin-top: 2rem;">
+        <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem;">
+          <button class="btn btn-danger btn-lg" onclick="hostCancelGame()">
+            <span>✖</span> Cancelar Jogo
+          </button>
           <button class="btn btn-primary btn-lg" onclick="hostShowLeaderboard()">
             <span>🏆</span> Ver Placar de Líderes
           </button>
@@ -221,7 +232,10 @@
           <!-- Itens do placar inseridos dinamicamente -->
         </div>
 
-        <div style="display: flex; justify-content: center; margin-top: 2rem;">
+        <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem;">
+          <button class="btn btn-danger btn-lg" onclick="hostCancelGame()">
+            <span>✖</span> Cancelar Jogo
+          </button>
           <button id="btn-next-step" class="btn btn-success btn-lg" onclick="hostNextQuestion()">
             <span>▶️</span> Próxima Pergunta
           </button>

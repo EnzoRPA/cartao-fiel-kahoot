@@ -144,40 +144,89 @@ function showScreen(screenId) {
 }
 
 // --- DASHBOARD & QUIZZES SALVOS ---
-function getSavedQuizzes() {
-  const stored = localStorage.getItem('kahoot_custom_quizzes');
-  if (stored) {
-    try {
-      const custom = JSON.parse(stored);
-      return [...custom, ...defaultQuizzes];
-    } catch (e) {
-      console.error(e);
-    }
+let serverQuizzes = [];
+
+async function getSavedQuizzes() {
+  try {
+    const res = await fetch('/api/quizzes');
+    serverQuizzes = await res.json();
+  } catch (e) {
+    console.error('Erro ao carregar quizzes do servidor:', e);
+    serverQuizzes = [];
   }
-  return [...defaultQuizzes];
+  return [...serverQuizzes, ...defaultQuizzes];
 }
 
-function renderQuizGrid() {
+async function renderQuizGrid() {
   const container = document.getElementById('quiz-grid-container');
   if (!container) return;
 
-  const quizzes = getSavedQuizzes();
-  container.innerHTML = quizzes.map((q, idx) => `
-    <div class="quiz-card">
-      <div>
-        <div class="quiz-card-title">${escapeHtml(q.title)}</div>
-        <div class="quiz-card-meta">
-          <span>❓ ${q.questions.length} Perguntas</span>
-          <span>⏱️ ${q.questions[0]?.timeLimit || 20}s / perg.</span>
+  const quizzes = await getSavedQuizzes();
+  container.innerHTML = quizzes.map((q, idx) => {
+    const isDefault = defaultQuizzes.some(dq => dq.id === q.id);
+    return `
+      <div class="quiz-card">
+        <div>
+          <div class="quiz-card-title">${escapeHtml(q.title)}</div>
+          <div class="quiz-card-meta">
+            <span>❓ ${q.questions.length} Perguntas</span>
+            <span>⏱️ ${q.questions[0]?.timeLimit || 20}s / perg.</span>
+            ${isDefault ? '<span style="color: #00e5ff;">📌 Padrão</span>' : '<span style="color: #a78bfa;">💾 Salvo</span>'}
+          </div>
+        </div>
+        <div class="quiz-card-actions">
+          <button class="btn btn-success" style="width: 100%;" onclick="hostLaunchQuiz(${idx})">
+            <span>🎮</span> Iniciar Jogo
+          </button>
+          ${!isDefault ? `
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+              <button class="btn btn-secondary" style="flex: 1;" onclick="editQuiz('${q.id}')">
+                <span>✏️</span> Editar
+              </button>
+              <button class="btn btn-danger" style="flex: 1;" onclick="deleteQuiz('${q.id}')">
+                <span>🗑️</span> Excluir
+              </button>
+            </div>
+          ` : ''}
         </div>
       </div>
-      <div class="quiz-card-actions">
-        <button class="btn btn-success" style="width: 100%;" onclick="hostLaunchQuiz(${idx})">
-          <span>🎮</span> Iniciar Jogo
-        </button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+}
+
+async function editQuiz(quizId) {
+  const quiz = serverQuizzes.find(q => q.id === quizId);
+  if (!quiz) return;
+
+  document.getElementById('custom-title-input').value = quiz.title;
+  const wrapper = document.getElementById('custom-questions-wrapper');
+  wrapper.innerHTML = '';
+
+  quiz.questions.forEach(q => {
+    addQuestionFieldToForm();
+    const lastCard = wrapper.lastElementChild;
+    lastCard.querySelector('.q-text').value = q.question;
+    lastCard.querySelector('.q-opt0').value = q.options[0] || '';
+    lastCard.querySelector('.q-opt1').value = q.options[1] || '';
+    lastCard.querySelector('.q-opt2').value = q.options[2] || '';
+    lastCard.querySelector('.q-opt3').value = q.options[3] || '';
+    lastCard.querySelector('.q-correct').value = q.correctAnswer;
+  });
+
+  document.getElementById('create-modal').classList.add('active');
+  window._editingQuizId = quizId;
+}
+
+async function deleteQuiz(quizId) {
+  if (!confirm('Tem certeza que deseja excluir este quiz?')) return;
+
+  try {
+    await fetch(`/api/quizzes/${quizId}`, { method: 'DELETE' });
+    renderQuizGrid();
+  } catch (e) {
+    console.error('Erro ao excluir quiz:', e);
+    alert('Erro ao excluir quiz.');
+  }
 }
 
 // --- MODAIS ---
@@ -216,7 +265,7 @@ function switchAiTab(tab) {
 }
 
 // --- COLAR PERGUNTAS DO CHATGPT ---
-function handlePasteQuiz(e) {
+async function handlePasteQuiz(e) {
   e.preventDefault();
   const title = document.getElementById('paste-quiz-title').value.trim();
   const rawText = document.getElementById('paste-quiz-json').value.trim();
@@ -271,17 +320,16 @@ function handlePasteQuiz(e) {
     return;
   }
   
-  // Salvar quiz
-  const newQuiz = {
-    id: 'paste-quiz-' + Date.now(),
-    title: title,
-    questions: questions
-  };
-  
-  const stored = localStorage.getItem('kahoot_custom_quizzes');
-  const custom = stored ? JSON.parse(stored) : [];
-  custom.unshift(newQuiz);
-  localStorage.setItem('kahoot_custom_quizzes', JSON.stringify(custom));
+  // Salvar quiz via API
+  try {
+    await fetch('/api/quizzes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, questions })
+    });
+  } catch (e) {
+    console.error('Erro ao salvar quiz:', e);
+  }
   
   closeAiModal();
   renderQuizGrid();
@@ -378,6 +426,7 @@ function saveGeminiApiKey() {
 }
 
 function openCreateModal() {
+  window._editingQuizId = null;
   document.getElementById('custom-questions-wrapper').innerHTML = '';
   addQuestionFieldToForm();
   addQuestionFieldToForm();
@@ -444,19 +493,21 @@ function handleSaveCustomQuiz(e) {
     });
   });
 
-  const newQuiz = {
-    id: 'quiz-' + Date.now(),
-    title,
-    questions
-  };
+  const editingId = window._editingQuizId;
+  window._editingQuizId = null;
 
-  const stored = localStorage.getItem('kahoot_custom_quizzes');
-  const custom = stored ? JSON.parse(stored) : [];
-  custom.unshift(newQuiz);
-  localStorage.setItem('kahoot_custom_quizzes', JSON.stringify(custom));
-
-  closeCreateModal();
-  renderQuizGrid();
+  fetch(editingId ? `/api/quizzes/${editingId}` : '/api/quizzes', {
+    method: editingId ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, questions })
+  })
+    .then(() => {
+      closeCreateModal();
+      renderQuizGrid();
+    })
+    .catch(e => {
+      console.error('Erro ao salvar quiz:', e);
+    });
 }
 
 // --- GERADOR POR IA (GEMINI API) ---
@@ -482,22 +533,25 @@ async function handleAiGenerate(e) {
 
     const data = await response.json();
     if (data.success && data.questions) {
-      const newQuiz = {
-        id: 'ai-quiz-' + Date.now(),
-        title: data.title || `Quiz IA: ${topic}`,
-        questions: data.questions
-      };
-
-      const stored = localStorage.getItem('kahoot_custom_quizzes');
-      const custom = stored ? JSON.parse(stored) : [];
-      custom.unshift(newQuiz);
-      localStorage.setItem('kahoot_custom_quizzes', JSON.stringify(custom));
+      // Salvar via API
+      try {
+        await fetch('/api/quizzes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: data.title || `Quiz IA: ${topic}`,
+            questions: data.questions
+          })
+        });
+      } catch (e) {
+        console.error('Erro ao salvar quiz gerado:', e);
+      }
 
       closeAiModal();
       renderQuizGrid();
 
       // Já inicia o jogo criado pela IA imediatamente!
-      const allQuizzes = getSavedQuizzes();
+      const allQuizzes = await getSavedQuizzes();
       hostLaunchQuiz(0);
     } else {
       alert('Falha ao gerar o quiz por IA: ' + (data.error || 'Tente novamente.'));
@@ -512,8 +566,8 @@ async function handleAiGenerate(e) {
 }
 
 // --- FLUXO DO JOGO HOST ---
-function hostLaunchQuiz(quizIndex) {
-  const quizzes = getSavedQuizzes();
+async function hostLaunchQuiz(quizIndex) {
+  const quizzes = await getSavedQuizzes();
   currentQuiz = quizzes[quizIndex];
   if (!currentQuiz) return;
 
@@ -703,6 +757,25 @@ socket.on('leaderboard-update', ({ leaderboard }) => {
 function hostNextQuestion() {
   socket.emit('next-question', { pin: currentPin });
 }
+
+function hostCancelGame() {
+  if (!currentPin) return;
+  if (!confirm('Tem certeza que deseja cancelar o jogo? Todos os jogadores serão desconectados.')) return;
+  
+  socket.emit('cancel-game', { pin: currentPin });
+  currentPin = null;
+  currentQuiz = null;
+  if (hostTimerInterval) clearInterval(hostTimerInterval);
+  showScreen('dashboard-screen');
+}
+
+socket.on('game-cancelled', ({ message }) => {
+  currentPin = null;
+  currentQuiz = null;
+  if (hostTimerInterval) clearInterval(hostTimerInterval);
+  showScreen('dashboard-screen');
+  alert(message || 'O jogo foi cancelado.');
+});
 
 // PÓDIO FINAL
 socket.on('game-over-host', ({ podium }) => {

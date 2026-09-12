@@ -581,6 +581,105 @@ app.get('/api/ranking', (req, res) => {
   res.json(ranking);
 });
 
+// ==========================================================================
+// API DE QUIZZES (CRUD - Persistência em JSON)
+// ==========================================================================
+
+const QUIZZES_FILE = path.join(__dirname, 'data', 'quizzes.json');
+
+if (!fs.existsSync(QUIZZES_FILE)) {
+  fs.writeFileSync(QUIZZES_FILE, JSON.stringify([], null, 2), 'utf8');
+}
+
+function readQuizzes() {
+  try {
+    const data = fs.readFileSync(QUIZZES_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (e) {
+    console.error('Erro ao ler quizzes:', e);
+    return [];
+  }
+}
+
+function writeQuizzes(data) {
+  try {
+    fs.writeFileSync(QUIZZES_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Erro ao salvar quizzes:', e);
+  }
+}
+
+// Listar todos os quizzes
+app.get('/api/quizzes', (req, res) => {
+  const quizzes = readQuizzes();
+  res.json(quizzes);
+});
+
+// Obter um quiz específico
+app.get('/api/quizzes/:id', (req, res) => {
+  const quizzes = readQuizzes();
+  const quiz = quizzes.find(q => q.id === req.params.id);
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz não encontrado' });
+  }
+  res.json(quiz);
+});
+
+// Criar novo quiz
+app.post('/api/quizzes', (req, res) => {
+  const { title, questions } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'Título é obrigatório' });
+  }
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return res.status(400).json({ error: 'Quiz deve ter pelo menos 1 pergunta' });
+  }
+
+  const newQuiz = {
+    id: 'quiz-' + Date.now(),
+    title: title.trim(),
+    questions
+  };
+
+  const quizzes = readQuizzes();
+  quizzes.unshift(newQuiz);
+  writeQuizzes(quizzes);
+  res.status(201).json(newQuiz);
+});
+
+// Atualizar quiz existente
+app.put('/api/quizzes/:id', (req, res) => {
+  const { title, questions } = req.body;
+  const quizzes = readQuizzes();
+  const quiz = quizzes.find(q => q.id === req.params.id);
+  
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz não encontrado' });
+  }
+
+  if (title) quiz.title = title.trim();
+  if (Array.isArray(questions) && questions.length > 0) {
+    quiz.questions = questions;
+  }
+
+  writeQuizzes(quizzes);
+  res.json(quiz);
+});
+
+// Excluir quiz
+app.delete('/api/quizzes/:id', (req, res) => {
+  let quizzes = readQuizzes();
+  const index = quizzes.findIndex(q => q.id === req.params.id);
+  
+  if (index === -1) {
+    return res.status(404).json({ error: 'Quiz não encontrado' });
+  }
+
+  quizzes.splice(index, 1);
+  writeQuizzes(quizzes);
+  res.json({ success: true, message: 'Quiz excluído com sucesso' });
+});
+
 // Gerar imagem do QR Code localmente (offline friendly)
 app.get('/api/qr', async (req, res) => {
   const { text } = req.query;
@@ -605,7 +704,10 @@ io.on('connection', (socket) => {
   // --- EVENTOS DO HOST ---
   socket.on('create-room', async ({ quiz, baseUrl }) => {
     const pin = generateRoomPIN();
-    const hostBase = (baseUrl && baseUrl !== 'null') ? baseUrl : `http://${LOCAL_IP}:${PORT}`;
+    let hostBase = (baseUrl && baseUrl !== 'null') ? baseUrl : `http://${LOCAL_IP}:${PORT}`;
+    if (!hostBase.startsWith('http://') && !hostBase.startsWith('https://')) {
+      hostBase = `http://${hostBase}`;
+    }
     const joinUrl = `${hostBase}/player.html?pin=${pin}`;
 
     let qrCodeDataUrl = '';
@@ -677,6 +779,25 @@ io.on('connection', (socket) => {
     room.state = 'LEADERBOARD';
     const leaderboard = getLeaderboard(room);
     io.to(pin).emit('leaderboard-update', { leaderboard });
+  });
+
+  socket.on('cancel-game', ({ pin }) => {
+    const room = rooms[pin];
+    if (!room || room.hostSocketId !== socket.id) return;
+
+    io.to(pin).emit('game-cancelled', { message: 'O jogo foi cancelado pelo host.' });
+    
+    // Remover todos os jogadores da sala
+    Object.values(room.players).forEach(player => {
+      const playerSocket = io.sockets.sockets.get(player.socketId);
+      if (playerSocket) {
+        playerSocket.leave(pin);
+        delete playerSocket.pin;
+      }
+    });
+
+    socket.leave(pin);
+    delete rooms[pin];
   });
 
   // --- EVENTOS DO JOGADOR ---
@@ -893,7 +1014,7 @@ function processQuestionReveal(room) {
 function sendGameOver(room) {
   const leaderboard = getLeaderboard(room);
 
-  // Salvar pontos dos jogadores nos participantes (cap 5000)
+  // Salvar pontos dos jogadores nos participantes
   saveGamePointsToUsers(room);
 
   io.to(room.hostSocketId).emit('game-over-host', {

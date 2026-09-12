@@ -4,8 +4,17 @@
 
 const socket = io();
 
-let selectedAvatar = '🚀';
+let selectedAvatar = '🧒';
+let selectedUsername = '';
 let currentPin = null;
+let avatarInitialized = false;
+
+// USUÁRIOS FIXOS (IDs devem corresponder ao participants.json)
+const USERS = {
+  'Dalessandro': { defaultAvatar: '🧒', id: 'pl4hbh5mzl' },
+  'Pedro Lorenzo': { defaultAvatar: '👦', id: 'pasvjed0i4' },
+  'Eloá': { defaultAvatar: '👧', id: 'pl5a687w9c' }
+};
 
 // --- NAVEGAÇÃO DE TELAS ---
 function showPlayerScreen(screenId) {
@@ -24,30 +33,76 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-function selectAvatar(emoji) {
-  selectedAvatar = emoji;
-  document.querySelectorAll('.avatar-option').forEach(el => {
-    if (el.innerText === emoji) {
-      el.classList.add('selected');
-    } else {
-      el.classList.remove('selected');
-    }
-  });
+// --- PERSONALIZAÇÃO DE ABAS ---
+function switchCustomizeTab(tabId) {
+  document.querySelectorAll('.customize-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.customize-panel').forEach(p => p.classList.remove('active'));
+  
+  event.target.classList.add('active');
+  const panel = document.getElementById(tabId);
+  if (panel) panel.classList.add('active');
+}
+
+// SELEÇÃO DE USUÁRIO
+function selectUser(username) {
+  selectedUsername = username;
+  selectedAvatar = USERS[username].defaultAvatar;
+  
+  // Atualizar tela de personalização
+  document.getElementById('customize-username').innerText = username;
+  
+  // Inicializar Avatar Builder na primeira vez
+  if (!avatarInitialized && typeof AvatarBuilder !== 'undefined') {
+    AvatarBuilder.initOptions();
+    avatarInitialized = true;
+  }
+  
+  // Renderizar avatar
+  if (typeof AvatarBuilder !== 'undefined') {
+    AvatarBuilder.render(document.getElementById('avatar-preview-svg'));
+  }
+  
+  showPlayerScreen('player-customize-screen');
+}
+
+function goBackToUserSelect() {
+  showPlayerScreen('player-user-select-screen');
+}
+
+function goToPinInput() {
+  // Renderizar avatar nos previews
+  if (typeof AvatarBuilder !== 'undefined') {
+    AvatarBuilder.render(document.getElementById('login-avatar-svg'));
+    AvatarBuilder.render(document.getElementById('lobby-avatar-svg'));
+  }
+  
+  document.getElementById('login-username-display').innerText = selectedUsername;
+  showPlayerScreen('player-login-screen');
+}
+
+function goBackToCustomize() {
+  showPlayerScreen('player-customize-screen');
 }
 
 function handlePlayerJoin(e) {
   e.preventDefault();
   const pin = document.getElementById('player-pin-input').value.trim();
-  const nickname = document.getElementById('player-name-input').value.trim();
   const errorAlert = document.getElementById('error-alert');
 
   errorAlert.style.display = 'none';
   currentPin = pin;
 
+  // Obter dados do avatar como SVG string
+  let avatarData = selectedAvatar;
+  if (typeof AvatarBuilder !== 'undefined') {
+    avatarData = AvatarBuilder.renderAvatarString();
+  }
+
   socket.emit('join-room', {
     pin,
-    nickname,
-    avatar: selectedAvatar
+    nickname: selectedUsername,
+    avatar: avatarData,
+    userId: USERS[selectedUsername].id
   });
 }
 
@@ -58,9 +113,14 @@ socket.on('join-error', ({ message }) => {
 });
 
 socket.on('joined-success', ({ pin, nickname, avatar, quizTitle }) => {
-  document.getElementById('player-avatar-display').innerText = avatar;
+  // Exibir avatar SVG no lobby
+  const lobbyAvatarContainer = document.getElementById('player-avatar-display');
+  if (lobbyAvatarContainer) {
+    lobbyAvatarContainer.innerHTML = avatar;
+    lobbyAvatarContainer.style.fontSize = '0';
+  }
+  
   document.getElementById('player-nickname-display').innerText = nickname;
-
   showPlayerScreen('player-lobby-screen');
   window.kahootAudio.playJoinSound();
 });
@@ -138,5 +198,16 @@ socket.on('game-over-player', ({ finalRank, totalScore, totalPlayers }) => {
     window.kahootAudio.playVictorySound();
   } else {
     medalEl.innerText = '👏';
+  }
+});
+
+// JOGO CANCELADO PELO HOST
+socket.on('game-cancelled', ({ message }) => {
+  currentPin = null;
+  showPlayerScreen('player-login-screen');
+  const errorAlert = document.getElementById('error-alert');
+  if (errorAlert) {
+    errorAlert.innerText = message || 'O jogo foi cancelado pelo organizador.';
+    errorAlert.style.display = 'block';
   }
 });
