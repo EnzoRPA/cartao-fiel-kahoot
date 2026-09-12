@@ -731,6 +731,10 @@ socket.on('room-created', ({ pin, joinUrl, qrCodeDataUrl }) => {
   document.getElementById('lobby-players-list').innerHTML = '';
   document.getElementById('lobby-player-count').innerText = '0';
 
+  // Atualizar botão "Entrar como Jogador" com o PIN da sala atual
+  const joinBtn = document.getElementById('btn-join-as-player');
+  if (joinBtn) joinBtn.href = `/player.html?pin=${pin}`;
+
   showScreen('lobby-screen');
 });
 
@@ -915,6 +919,9 @@ function hostCancelGame() {
   currentPin = null;
   currentQuiz = null;
   if (hostTimerInterval) clearInterval(hostTimerInterval);
+  // Resetar botão de jogador
+  const joinBtn = document.getElementById('btn-join-as-player');
+  if (joinBtn) joinBtn.href = '/player.html';
   showScreen('dashboard-screen');
 }
 
@@ -922,6 +929,9 @@ socket.on('game-cancelled', ({ message }) => {
   currentPin = null;
   currentQuiz = null;
   if (hostTimerInterval) clearInterval(hostTimerInterval);
+  // Resetar botão de jogador
+  const joinBtn = document.getElementById('btn-join-as-player');
+  if (joinBtn) joinBtn.href = '/player.html';
   showScreen('dashboard-screen');
   alert(message || 'O jogo foi cancelado.');
 });
