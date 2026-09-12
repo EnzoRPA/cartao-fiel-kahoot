@@ -274,51 +274,100 @@
 
   <!-- MODAL: GERADOR DE QUIZ COM IA -->
   <div id="ai-modal" class="modal-backdrop">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 650px;">
       <button class="modal-close" onclick="closeAiModal()">✕</button>
       <h2 style="font-family: var(--font-heading); font-size: 1.8rem; margin-bottom: 0.5rem; color: #ec4899;">
-        🤖 Gerar Quiz com Inteligência Artificial
+        🤖 Criar Quiz
       </h2>
-      <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
-        Digite o assunto ou tema da aula e a IA irá criar as perguntas e alternativas automaticamente!
-      </p>
 
-      <form id="ai-generator-form" onsubmit="handleAiGenerate(event)">
-        <div class="form-group">
-          <label class="form-label">Tema ou Assunto do Quiz:</label>
-          <input type="text" id="ai-topic-input" class="form-input" placeholder="Ex: História do Brasil, Geometria Básica, Vingadores..." required>
-        </div>
-
-        <div class="form-group" style="display: flex; gap: 1rem;">
-          <div style="flex: 1;">
-            <label class="form-label">Qtd. de Perguntas:</label>
-            <select id="ai-num-select" class="form-select">
-              <option value="3">3 Perguntas</option>
-              <option value="5" selected>5 Perguntas</option>
-              <option value="8">8 Perguntas</option>
-              <option value="10">10 Perguntas</option>
-            </select>
-          </div>
-
-          <div style="flex: 1;">
-            <label class="form-label">Dificuldade:</label>
-            <select id="ai-diff-select" class="form-select">
-              <option value="facil">Fácil</option>
-              <option value="medio" selected>Médio</option>
-              <option value="dificil">Desafiador</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="ai-loading-indicator" style="display: none; text-align: center; margin: 1.2rem 0; color: #00e5ff; font-weight: bold;">
-          <span style="font-size: 1.5rem; display: inline-block; animation: pulse 0.8s infinite;">✨</span>
-          Gerando perguntas com IA... Aguarde alguns instantes.
-        </div>
-
-        <button type="submit" id="btn-submit-ai" class="btn btn-ai btn-lg" style="width: 100%; margin-top: 1rem;">
-          <span>✨</span> Criar Quiz Agora
+      <!-- ABAS -->
+      <div style="display: flex; gap: 6px; margin-bottom: 1.5rem;">
+        <button class="btn btn-secondary" id="tab-btn-ai" onclick="switchAiTab('ai')" style="flex: 1; font-size: 0.9rem;">
+          <span>✨</span> Gerar com IA
         </button>
-      </form>
+        <button class="btn btn-secondary" id="tab-btn-paste" onclick="switchAiTab('paste')" style="flex: 1; font-size: 0.9rem;">
+          <span>📋</span> Colar Perguntas
+        </button>
+      </div>
+
+      <!-- ABA: GERAR COM IA -->
+      <div id="ai-tab-ai" class="ai-tab-content">
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
+          Digite o assunto e a IA irá criar as perguntas automaticamente!
+        </p>
+
+        <form id="ai-generator-form" onsubmit="handleAiGenerate(event)">
+          <div class="form-group">
+            <label class="form-label">Tema ou Assunto do Quiz:</label>
+            <input type="text" id="ai-topic-input" class="form-input" placeholder="Ex: 28 Crenças Adventistas, História do Brasil..." required>
+          </div>
+
+          <div class="form-group" style="display: flex; gap: 1rem;">
+            <div style="flex: 1;">
+              <label class="form-label">Qtd. de Perguntas:</label>
+              <select id="ai-num-select" class="form-select">
+                <option value="3">3 Perguntas</option>
+                <option value="5" selected>5 Perguntas</option>
+                <option value="8">8 Perguntas</option>
+                <option value="10">10 Perguntas</option>
+              </select>
+            </div>
+            <div style="flex: 1;">
+              <label class="form-label">Dificuldade:</label>
+              <select id="ai-diff-select" class="form-select">
+                <option value="facil">Fácil</option>
+                <option value="medio" selected>Médio</option>
+                <option value="dificil">Desafiador</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="ai-loading-indicator" style="display: none; text-align: center; margin: 1.2rem 0; color: #00e5ff; font-weight: bold;">
+            <span style="font-size: 1.5rem; display: inline-block; animation: pulse 0.8s infinite;">✨</span>
+            Gerando perguntas com IA... Aguarde alguns instantes.
+          </div>
+
+          <button type="submit" id="btn-submit-ai" class="btn btn-ai btn-lg" style="width: 100%; margin-top: 1rem;">
+            <span>✨</span> Criar Quiz com IA
+          </button>
+        </form>
+      </div>
+
+      <!-- ABA: COLAR PERGUNTAS -->
+      <div id="ai-tab-paste" class="ai-tab-content" style="display: none;">
+        <p style="color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.95rem;">
+          Cole o JSON gerado pelo ChatGPT, DeepSeek, etc.
+        </p>
+        <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.8rem; background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.2);">
+          <strong style="color: #00e5ff;">Prompt sugerido para o ChatGPT:</strong><br>
+          <em>"Gere um quiz JSON sobre [TEMA] com [N] perguntas no formato: [{question, options[4], correctAnswer, timeLimit}]"</em>
+        </p>
+
+        <form id="paste-quiz-form" onsubmit="handlePasteQuiz(event)">
+          <div class="form-group">
+            <label class="form-label">Título do Quiz:</label>
+            <input type="text" id="paste-quiz-title" class="form-input" placeholder="Ex: Quiz sobre as 28 Crenças" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Cole o JSON abaixo:</label>
+            <textarea id="paste-quiz-json" class="form-input" rows="12" style="font-family: monospace; font-size: 0.85rem; resize: vertical;" placeholder='[
+  {
+    "question": "Qual é a 1ª Crença Fundamental?",
+    "options": ["As Escrituras", "A Trindade", "O Batismo", "A Criação"],
+    "correctAnswer": 0,
+    "timeLimit": 25
+  }
+]' required></textarea>
+          </div>
+
+          <div id="paste-error-msg" style="display: none; background: rgba(226,27,60,0.3); border: 1px solid #e21b3c; padding: 0.8rem; border-radius: 10px; margin-bottom: 1rem; color: #ffb4c0; font-size: 0.9rem;"></div>
+
+          <button type="submit" class="btn btn-success btn-lg" style="width: 100%;">
+            <span>💾</span> Salvar Quiz
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 

@@ -183,10 +183,101 @@ function renderQuizGrid() {
 // --- MODAIS ---
 function openAiModal() {
   document.getElementById('ai-modal').classList.add('active');
+  switchAiTab('ai');
 }
 
 function closeAiModal() {
   document.getElementById('ai-modal').classList.remove('active');
+}
+
+// --- ABAS DO MODAL IA ---
+function switchAiTab(tab) {
+  document.getElementById('ai-tab-ai').style.display = tab === 'ai' ? 'block' : 'none';
+  document.getElementById('ai-tab-paste').style.display = tab === 'paste' ? 'block' : 'none';
+  
+  const btnAi = document.getElementById('tab-btn-ai');
+  const btnPaste = document.getElementById('tab-btn-paste');
+  
+  if (tab === 'ai') {
+    btnAi.style.background = 'rgba(0, 229, 255, 0.2)';
+    btnAi.style.borderColor = '#00e5ff';
+    btnAi.style.color = '#00e5ff';
+    btnPaste.style.background = 'rgba(255,255,255,0.12)';
+    btnPaste.style.borderColor = 'var(--glass-border)';
+    btnPaste.style.color = 'white';
+  } else {
+    btnPaste.style.background = 'rgba(0, 229, 255, 0.2)';
+    btnPaste.style.borderColor = '#00e5ff';
+    btnPaste.style.color = '#00e5ff';
+    btnAi.style.background = 'rgba(255,255,255,0.12)';
+    btnAi.style.borderColor = 'var(--glass-border)';
+    btnAi.style.color = 'white';
+  }
+}
+
+// --- COLAR PERGUNTAS DO CHATGPT ---
+function handlePasteQuiz(e) {
+  e.preventDefault();
+  const title = document.getElementById('paste-quiz-title').value.trim();
+  const jsonStr = document.getElementById('paste-quiz-json').value.trim();
+  const errorDiv = document.getElementById('paste-error-msg');
+  
+  errorDiv.style.display = 'none';
+  
+  let questions;
+  try {
+    let parsed = JSON.parse(jsonStr);
+    
+    // Se for um objeto com array "questions" dentro
+    if (parsed.questions && Array.isArray(parsed.questions)) {
+      parsed = parsed.questions;
+    }
+    
+    // Se não for array, erro
+    if (!Array.isArray(parsed)) {
+      throw new Error('O JSON deve ser um array de perguntas.');
+    }
+    
+    // Validar cada pergunta
+    questions = parsed.map((q, i) => {
+      if (!q.question) throw new Error(`Pergunta ${i + 1}: campo "question" obrigatório.`);
+      if (!Array.isArray(q.options) || q.options.length !== 4) {
+        throw new Error(`Pergunta ${i + 1}: "options" deve ter exatamente 4 itens.`);
+      }
+      if (q.correctAnswer === undefined || q.correctAnswer < 0 || q.correctAnswer > 3) {
+        throw new Error(`Pergunta ${i + 1}: "correctAnswer" deve ser 0, 1, 2 ou 3.`);
+      }
+      return {
+        question: q.question,
+        options: q.options,
+        correctAnswer: parseInt(q.correctAnswer),
+        timeLimit: parseInt(q.timeLimit) || 25
+      };
+    });
+  } catch (err) {
+    errorDiv.innerText = '❌ ' + err.message;
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Salvar quiz
+  const newQuiz = {
+    id: 'paste-quiz-' + Date.now(),
+    title: title,
+    questions: questions
+  };
+  
+  const stored = localStorage.getItem('kahoot_custom_quizzes');
+  const custom = stored ? JSON.parse(stored) : [];
+  custom.unshift(newQuiz);
+  localStorage.setItem('kahoot_custom_quizzes', JSON.stringify(custom));
+  
+  closeAiModal();
+  renderQuizGrid();
+  
+  // Limpar formulário
+  document.getElementById('paste-quiz-title').value = '';
+  document.getElementById('paste-quiz-json').value = '';
 }
 
 function openSettingsModal() {
@@ -360,6 +451,15 @@ socket.on('room-created', ({ pin, joinUrl, qrCodeDataUrl }) => {
   showScreen('lobby-screen');
 });
 
+// Helper para renderizar avatar (SVG ou emoji)
+function renderAvatarHtml(avatar, size = 28) {
+  if (!avatar) return '❓';
+  if (avatar.startsWith('<svg') || avatar.includes('<svg')) {
+    return `<div style="width: ${size}px; height: ${size}px; border-radius: 50%; overflow: hidden; flex-shrink: 0;">${avatar}</div>`;
+  }
+  return `<span style="font-size: ${size * 0.7}px;">${avatar}</span>`;
+}
+
 socket.on('player-joined', ({ playerCount, players }) => {
   document.getElementById('lobby-player-count').innerText = playerCount;
   currentTotalPlayers = playerCount;
@@ -367,7 +467,7 @@ socket.on('player-joined', ({ playerCount, players }) => {
   const list = document.getElementById('lobby-players-list');
   list.innerHTML = players.map(p => `
     <div class="player-tag">
-      <span>${escapeHtml(p.avatar)}</span>
+      ${renderAvatarHtml(p.avatar)}
       <span>${escapeHtml(p.nickname)}</span>
     </div>
   `).join('');
@@ -381,7 +481,7 @@ socket.on('player-left', ({ playerCount, players }) => {
   const list = document.getElementById('lobby-players-list');
   list.innerHTML = players.map(p => `
     <div class="player-tag">
-      <span>${escapeHtml(p.avatar)}</span>
+      ${renderAvatarHtml(p.avatar)}
       <span>${escapeHtml(p.nickname)}</span>
     </div>
   `).join('');
@@ -504,7 +604,7 @@ socket.on('leaderboard-update', ({ leaderboard }) => {
     <div class="leaderboard-item">
       <div style="display: flex; align-items: center; gap: 12px;">
         <span style="font-size: 1.4rem;">${index + 1}.</span>
-        <span>${escapeHtml(player.avatar)}</span>
+        ${renderAvatarHtml(player.avatar, 36)}
         <span>${escapeHtml(player.nickname)}</span>
         ${player.streak >= 2 ? `<span style="font-size: 0.9rem; background: #ff4081; padding: 2px 8px; border-radius: 12px; color: white;">🔥 ${player.streak}x</span>` : ''}
       </div>
@@ -539,15 +639,29 @@ socket.on('game-over-host', ({ podium }) => {
   const p2 = podium[1] || { nickname: '-', avatar: '🥈', score: 0 };
   const p3 = podium[2] || { nickname: '-', avatar: '🥉', score: 0 };
 
-  document.getElementById('podium-avatar-1').innerText = p1.avatar;
+  // Renderizar avatares no pódio (SVG ou emoji)
+  const avatar1El = document.getElementById('podium-avatar-1');
+  const avatar2El = document.getElementById('podium-avatar-2');
+  const avatar3El = document.getElementById('podium-avatar-3');
+
+  function setPodiumAvatar(el, avatar) {
+    if (avatar && (avatar.startsWith('<svg') || avatar.includes('<svg'))) {
+      el.innerHTML = avatar;
+      el.style.fontSize = '0';
+    } else {
+      el.innerText = avatar;
+    }
+  }
+
+  setPodiumAvatar(avatar1El, p1.avatar);
   document.getElementById('podium-name-1').innerText = p1.nickname;
   document.getElementById('podium-score-1').innerText = `${p1.score} pts`;
 
-  document.getElementById('podium-avatar-2').innerText = p2.avatar;
+  setPodiumAvatar(avatar2El, p2.avatar);
   document.getElementById('podium-name-2').innerText = p2.nickname;
   document.getElementById('podium-score-2').innerText = `${p2.score} pts`;
 
-  document.getElementById('podium-avatar-3').innerText = p3.avatar;
+  setPodiumAvatar(avatar3El, p3.avatar);
   document.getElementById('podium-name-3').innerText = p3.nickname;
   document.getElementById('podium-score-3').innerText = `${p3.score} pts`;
 });
