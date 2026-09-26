@@ -11,7 +11,7 @@
           "Domingo",
           "Segunda-feira"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 1,
         "timeLimit": 30
       },
       {
@@ -22,7 +22,7 @@
           "O descanso de Deus no sétimo dia",
           "A separação entre a terra e o mar"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 2,
         "timeLimit": 30
       },
       {
@@ -33,7 +33,7 @@
           "Da construção do templo",
           "Do nascimento de Jesus"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 1,
         "timeLimit": 30
       },
       {
@@ -44,7 +44,7 @@
           "Do meio-dia ao meio-dia",
           "Do pôr do sol ao pôr do sol"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 3,
         "timeLimit": 30
       },
       {
@@ -55,7 +55,7 @@
           "Adoração e comunhão com Deus",
           "Busca por lucro financeiro"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 2,
         "timeLimit": 30
       },
       {
@@ -66,7 +66,7 @@
           "Deus",
           "Os apóstolos"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 2,
         "timeLimit": 30
       },
       {
@@ -77,7 +77,7 @@
           "Jesus trabalhou normalmente no sábado",
           "Jesus aboliu o sábado"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 0,
         "timeLimit": 30
       },
       {
@@ -88,7 +88,7 @@
           "Realizar atividades comerciais",
           "Buscar riquezas materiais"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 1,
         "timeLimit": 30
       },
       {
@@ -99,7 +99,7 @@
           "Porque Deus descansou, abençoou e santificou o sétimo dia após a criação",
           "Porque os israelitas escolheram esse dia"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 2,
         "timeLimit": 30
       },
       {
@@ -110,7 +110,7 @@
           "Dedicar um tempo especial ao descanso, à adoração e à comunhão com Deus",
           "Evitar qualquer contato com outras pessoas"
         ],
-        "correctAnswer": null,
+        "correctAnswer": 2,
         "timeLimit": 30
       }
     ]

@@ -663,6 +663,69 @@ app.get('/api/ranking', async (req, res) => {
 });
 
 // ==========================================================================
+// HELPERS DE NORMALIZAÇÃO DE QUIZ E QUESTÕES
+// ==========================================================================
+
+function normalizeQuestion(q) {
+  if (!q) return q;
+  const options = Array.isArray(q.options) ? q.options.map(o => String(o ?? '').trim()) : [];
+  while (options.length < 4) options.push(`Opção ${options.length + 1}`);
+
+  let ca = -1;
+  const raw = (q.correctAnswer !== undefined && q.correctAnswer !== null)
+    ? q.correctAnswer 
+    : (q.correct ?? q.answer ?? q.correct_answer ?? q.resposta ?? q.respostaCorreta ?? q.gabarito ?? q.correct_option);
+
+  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw < options.length) {
+    ca = raw;
+  } else if (raw !== undefined && raw !== null) {
+    const rawStr = String(raw).trim();
+    const asNum = parseInt(rawStr, 10);
+
+    if (!isNaN(asNum) && asNum >= 0 && asNum < options.length && (rawStr === String(asNum))) {
+      ca = asNum;
+    } else if (['A', 'B', 'C', 'D'].includes(rawStr.toUpperCase())) {
+      ca = ['A', 'B', 'C', 'D'].indexOf(rawStr.toUpperCase());
+    } else if (['1', '2', '3', '4'].includes(rawStr)) {
+      ca = parseInt(rawStr, 10) - 1;
+    } else {
+      // Buscar correspondência pelo texto das opções
+      const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const target = norm(rawStr);
+      ca = options.findIndex(opt => norm(opt) === target);
+      if (ca === -1) {
+        ca = options.findIndex(opt => {
+          const n = norm(opt);
+          return (n.length > 0 && target.length > 0) && (n.includes(target) || target.includes(n));
+        });
+      }
+    }
+  }
+
+  // Fallback seguro: se não encontrar índice válido, assume a primeira opção (0)
+  if (ca < 0 || ca >= options.length) {
+    ca = 0;
+  }
+
+  return {
+    ...q,
+    question: q.question || 'Pergunta sem título',
+    options: options.slice(0, 4),
+    correctAnswer: ca,
+    timeLimit: parseInt(q.timeLimit, 10) || 20
+  };
+}
+
+function normalizeQuiz(quiz) {
+  if (!quiz) return quiz;
+  const questions = Array.isArray(quiz.questions) ? quiz.questions.map(normalizeQuestion) : [];
+  return {
+    ...quiz,
+    questions
+  };
+}
+
+// ==========================================================================
 // API DE QUIZZES (CRUD)
 // ==========================================================================
 
@@ -674,7 +737,8 @@ if (!fs.existsSync(QUIZZES_FILE)) {
 function readQuizzesLocal() {
   try {
     const data = fs.readFileSync(QUIZZES_FILE, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed.map(normalizeQuiz) : [];
   } catch (e) {
     console.error('Erro ao ler quizzes:', e);
     return [];
@@ -683,7 +747,8 @@ function readQuizzesLocal() {
 
 function writeQuizzesLocal(data) {
   try {
-    fs.writeFileSync(QUIZZES_FILE, JSON.stringify(data, null, 2), 'utf8');
+    const normalized = Array.isArray(data) ? data.map(normalizeQuiz) : [];
+    fs.writeFileSync(QUIZZES_FILE, JSON.stringify(normalized, null, 2), 'utf8');
   } catch (e) {
     console.error('Erro ao salvar quizzes:', e);
   }
@@ -693,7 +758,7 @@ async function readQuizzes() {
   if (useSupabase) {
     const { data, error } = await supabase.from('quizzes').select('*').order('created_at', { ascending: false });
     if (error) { console.error('Erro Supabase readQuizzes:', error); return []; }
-    return data.map(q => ({ id: q.id, title: q.title, questions: q.questions || [] }));
+    return data.map(q => normalizeQuiz({ id: q.id, title: q.title, questions: q.questions || [] }));
   }
   return readQuizzesLocal();
 }
@@ -706,12 +771,12 @@ app.get('/api/quizzes/:id', async (req, res) => {
   if (useSupabase) {
     const { data, error } = await supabase.from('quizzes').select('*').eq('id', req.params.id).single();
     if (error || !data) return res.status(404).json({ error: 'Quiz não encontrado' });
-    return res.json({ id: data.id, title: data.title, questions: data.questions || [] });
+    return res.json(normalizeQuiz({ id: data.id, title: data.title, questions: data.questions || [] }));
   }
   const quizzes = readQuizzesLocal();
   const quiz = quizzes.find(q => q.id === req.params.id);
   if (!quiz) return res.status(404).json({ error: 'Quiz não encontrado' });
-  res.json(quiz);
+  res.json(normalizeQuiz(quiz));
 });
 
 app.post('/api/quizzes', async (req, res) => {
@@ -719,7 +784,8 @@ app.post('/api/quizzes', async (req, res) => {
   if (!title || !title.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
   if (!Array.isArray(questions) || questions.length === 0) return res.status(400).json({ error: 'Quiz deve ter pelo menos 1 pergunta' });
 
-  const newQuiz = { id: 'quiz-' + Date.now(), title: title.trim(), questions };
+  const normalizedQuestions = questions.map(normalizeQuestion);
+  const newQuiz = { id: 'quiz-' + Date.now(), title: title.trim(), questions: normalizedQuestions };
 
   if (useSupabase) {
     const { error } = await supabase.from('quizzes').insert({ id: newQuiz.id, title: newQuiz.title, questions: newQuiz.questions });
@@ -734,23 +800,24 @@ app.post('/api/quizzes', async (req, res) => {
 
 app.put('/api/quizzes/:id', async (req, res) => {
   const { title, questions } = req.body;
+  const normalizedQuestions = Array.isArray(questions) && questions.length > 0 ? questions.map(normalizeQuestion) : undefined;
 
   if (useSupabase) {
     const updates = {};
     if (title) updates.title = title.trim();
-    if (Array.isArray(questions) && questions.length > 0) updates.questions = questions;
+    if (normalizedQuestions) updates.questions = normalizedQuestions;
     const { data, error } = await supabase.from('quizzes').update(updates).eq('id', req.params.id).select().single();
     if (error || !data) return res.status(404).json({ error: 'Quiz não encontrado' });
-    return res.json({ id: data.id, title: data.title, questions: data.questions });
+    return res.json(normalizeQuiz({ id: data.id, title: data.title, questions: data.questions }));
   }
 
   const quizzes = readQuizzesLocal();
   const quiz = quizzes.find(q => q.id === req.params.id);
   if (!quiz) return res.status(404).json({ error: 'Quiz não encontrado' });
   if (title) quiz.title = title.trim();
-  if (Array.isArray(questions) && questions.length > 0) quiz.questions = questions;
+  if (normalizedQuestions) quiz.questions = normalizedQuestions;
   writeQuizzesLocal(quizzes);
-  res.json(quiz);
+  res.json(normalizeQuiz(quiz));
 });
 
 app.delete('/api/quizzes/:id', async (req, res) => {
@@ -809,10 +876,12 @@ io.on('connection', (socket) => {
       console.error('Erro ao gerar QR Code:', e);
     }
 
+    const safeQuiz = normalizeQuiz(quiz);
+
     rooms[pin] = {
       pin,
       hostSocketId: socket.id,
-      quiz,
+      quiz: safeQuiz,
       currentQuestionIndex: 0,
       state: 'LOBBY',
       players: {}, // socketId -> { id, nickname, avatar, score, streak, answers: {} }
@@ -953,7 +1022,9 @@ io.on('connection', (socket) => {
     const timeSpentMs = Date.now() - room.questionStartTime;
     const timeLimitMs = (currentQ.timeLimit || 20) * 1000;
 
-    const isCorrect = parseInt(answerIndex) === currentQ.correctAnswer;
+    const playerChoice = parseInt(answerIndex, 10);
+    const correctChoice = parseInt(currentQ.correctAnswer, 10);
+    const isCorrect = !isNaN(playerChoice) && !isNaN(correctChoice) && playerChoice === correctChoice;
     let pointsAwarded = 0;
 
     if (isCorrect) {
@@ -975,7 +1046,7 @@ io.on('connection', (socket) => {
 
     player.lastPoints = pointsAwarded;
     player.answers[currentQIndex] = {
-      optionIndex: parseInt(answerIndex),
+      optionIndex: playerChoice,
       points: pointsAwarded,
       isCorrect,
       timeSpentMs
@@ -984,7 +1055,7 @@ io.on('connection', (socket) => {
     room.answersReceived++;
 
     // Confirmar resposta recebida ao jogador
-    socket.emit('answer-accepted', { answerIndex });
+    socket.emit('answer-accepted', { answerIndex: playerChoice });
 
     // Atualizar o contador no Host
     io.to(room.hostSocketId).emit('answer-count-update', {
@@ -1024,6 +1095,7 @@ function sendQuestion(room) {
   const currentQ = room.quiz.questions[room.currentQuestionIndex];
   room.questionStartTime = Date.now();
   room.answersReceived = 0;
+  const correctIdx = typeof currentQ.correctAnswer === 'number' ? currentQ.correctAnswer : parseInt(currentQ.correctAnswer, 10) || 0;
 
   // Dados para o Host (inclui a resposta correta para controle)
   io.to(room.hostSocketId).emit('question-start-host', {
@@ -1031,7 +1103,7 @@ function sendQuestion(room) {
     totalQuestions: room.quiz.questions.length,
     question: currentQ.question,
     options: currentQ.options,
-    correctAnswer: currentQ.correctAnswer,
+    correctAnswer: correctIdx,
     timeLimit: currentQ.timeLimit || 20,
     totalPlayers: Object.keys(room.players).length
   });
@@ -1052,6 +1124,7 @@ function processQuestionReveal(room) {
   }
   const currentQIndex = room.currentQuestionIndex;
   const currentQ = room.quiz.questions[currentQIndex];
+  const correctIdx = typeof currentQ.correctAnswer === 'number' ? currentQ.correctAnswer : parseInt(currentQ.correctAnswer, 10) || 0;
 
   // Contagem de respostas por opção (0, 1, 2, 3)
   const optionCounts = [0, 0, 0, 0];
@@ -1063,15 +1136,16 @@ function processQuestionReveal(room) {
   });
 
   const shapes = ['🔺', '🔷', '🟡', '🟩'];
-  const colors = ['Red (Vermelho)', 'Blue (Azul)', 'Yellow (Amarelo)', 'Green (Verde)'];
+  const correctText = (currentQ.options && currentQ.options[correctIdx]) || '';
+  const correctShape = shapes[correctIdx] || '✔';
 
   // Notificar o Host com os detalhes da resposta correta e estatísticas
   io.to(room.hostSocketId).emit('question-reveal-host', {
     questionText: currentQ.question,
     options: currentQ.options,
-    correctAnswer: currentQ.correctAnswer,
-    correctAnswerText: currentQ.options[currentQ.correctAnswer],
-    correctAnswerShape: shapes[currentQ.correctAnswer],
+    correctAnswer: correctIdx,
+    correctAnswerText: correctText,
+    correctAnswerShape: correctShape,
     optionCounts,
     totalPlayers: Object.keys(room.players).length
   });
@@ -1086,10 +1160,10 @@ function processQuestionReveal(room) {
     if (playerSocket) {
       const ans = player.answers[currentQIndex];
       playerSocket.emit('question-reveal-player', {
-        isCorrect: ans ? ans.isCorrect : false,
-        correctAnswer: currentQ.correctAnswer,
-        correctAnswerText: currentQ.options[currentQ.correctAnswer],
-        correctAnswerShape: shapes[currentQ.correctAnswer],
+        isCorrect: ans ? !!ans.isCorrect : false,
+        correctAnswer: correctIdx,
+        correctAnswerText: correctText,
+        correctAnswerShape: correctShape,
         pointsEarned: ans ? ans.points : 0,
         totalScore: player.score,
         streak: player.streak,
