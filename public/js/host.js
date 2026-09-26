@@ -837,6 +837,15 @@ socket.on('answer-count-update', ({ answersReceived, totalPlayers }) => {
   document.getElementById('answers-counter').innerText = `${answersReceived} / ${totalPlayers}`;
 
   window.kahootAudio.playTickSound();
+
+  // Se todos responderam, para o timer e avança imediatamente
+  if (totalPlayers > 0 && answersReceived >= totalPlayers) {
+    if (hostTimerInterval) {
+      clearInterval(hostTimerInterval);
+      hostTimerInterval = null;
+    }
+    hostShowReveal();
+  }
 });
 
 function hostShowReveal() {
